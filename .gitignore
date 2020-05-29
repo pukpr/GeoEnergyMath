@@ -1,0 +1,8 @@
+*.o
+*.ali
+*.stderr
+*.stdout
+b__*
+*.exe
+*.cgpr
+*.bexch
