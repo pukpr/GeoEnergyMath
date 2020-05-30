@@ -23,7 +23,7 @@ package GEM.LTE is
          Wavenumber, Amplitude, Phase : Long_Float;
       end record;
 
-   type Modulations is array (Positive range <>) of Modulation;
+   type Modulations is array (Integer range <>) of Modulation;
 
    -- Default values that produce a fit to NINO34 of cc = ~0.83
    -- The period values can be derived from the constants above
@@ -55,6 +55,18 @@ package GEM.LTE is
    (2.763168894,	4.782646953,	-1.531748603),
    (42.38703079, 	4.206881588,	-5.741140747),
    (18.68216048, 	3.581731279,	-4.376886727)
+                                );
+
+   LTQ :  Modulations(1..0);
+    -- ( 1 => (1.0,	4.782646953,	-1.531748603) );
+
+   LPQ : constant Long_Periods := (
+  (182.623231,	0.018080271, 	-2.077486706),
+  (365.246462,  	0.018078892, 	1.575074188),
+  (13.60611041, 	-0.028703042,	-1.318646215),
+  --(13.66083077, 	0.001899387, 	-2.835798758),
+  (27.21222082, 	0.00125881,  	0.412311989)
+  --(27.32166155, 	0.000746357, 	0.466946899)
                                  );
 
 end GEM.LTE;

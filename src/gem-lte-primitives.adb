@@ -105,7 +105,7 @@ package body GEM.LTE.Primitives is
             TF : Long_Float := 0.0;
             use Ada.Numerics.Long_Elementary_Functions;
          begin
-            for J in LP'Range loop
+            for J in Constituents'Range loop
                declare
                   L : Long_Period renames Constituents(J);
                begin
@@ -144,6 +144,23 @@ package body GEM.LTE.Primitives is
       end loop;
       return Res;
    end LTE;
+
+   -- some of the values may not be modifiesd so this is used to identify them
+   function Is_Fixed (Value : in Long_Float) return Boolean is
+   begin
+      -- If a value happens to have the same value as a tidal period,
+      -- do not modify it and leave it as a fixed value.
+      for I in LP'Range loop
+         if Value = LP(I).Period then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Is_Fixed;
+
+   --
+   -- The following are utility functions for simulation
+   --
 
    -- Pearson's Correlation Coefficient
    function CC (X, Y : in Data_Pairs) return Long_Float is
@@ -203,21 +220,6 @@ package body GEM.LTE.Primitives is
       end loop;
    end Dump;
 
-   -- some of the values may not be modifiesd so this is used to identify them
-   function Is_Fixed (Value : in Long_Float) return Boolean is
-   begin
-      -- If a value happens to have the same value as a tidal period,
-      -- do not modify it and leave it as a fixed value.
-      for I in LP'Range loop
-         if Value = LP(I).Period then
-            --Value = Tidal_Constituents.LP(I).Amplitude or
-            --Value = Tidal_Constituents.LP(I).Phase then
-            return True;
-         end if;
-      end loop;
-      return False;
-   end Is_Fixed;
-
    Running : Boolean := True;
 
    procedure Stop is
@@ -229,6 +231,18 @@ package body GEM.LTE.Primitives is
    begin
       return not Running;
    end Halted;
+
+   procedure Save (Model, Data : in Data_Pairs;
+                   File_Name : in String := "lte_results.csv") is
+      FT : Text_IO.File_Type;
+   begin
+      Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
+      for I in Data'Range loop
+         Text_IO.Put_Line(FT, Data(I).Date'Img & ", " & Model(I).Value'Img &
+                                                 ", " & Data(I).Value'Img);
+      end loop;
+      Text_IO.Close(FT);
+   end Save;
 
 
 end GEM.LTE.Primitives;

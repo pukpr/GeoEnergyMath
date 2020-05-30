@@ -11,8 +11,9 @@ package GEM.LTE.Primitives is
    -- corresponding to a climate index such as ENSO
    function Make_Data (Name : in String) return Data_Pairs;
 
-   -- Should add a Save_Data here
-   -- procedure Make_Data (Name : in String; Data : in Data_Pairs);
+   -- Save results
+   procedure Save (Model, Data : in Data_Pairs;
+                   File_Name : in String := "lte_results.csv");
 
    --
    -- Main algorithms

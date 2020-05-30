@@ -27,6 +27,9 @@ package body GEM.LTE.Primitives.Solution is
       end loop;
    end Start;
 
+   Maximum_Loops : constant Long_Integer := GEM.Getenv("MAXLOOPS", 100_000);
+   Threshold : constant Integer := GEM.Getenv("THRESHOLD", 99);
+
    --
    -- This is the passive monitoring object with mutual exclusve access
    -- to the best metric provided by the executing threads
@@ -36,6 +39,7 @@ package body GEM.LTE.Primitives.Solution is
                        Client     : in Integer;
                        Count      : in Long_Integer;
                        Best       : out Boolean;  -- accessing thread deemed best
+                       BestClient : out Integer;
                        Percentage : out Integer); -- % of best metric if not best
       procedure Client (ID : out Integer); -- registering a thread ID, called once
       function Best_Value return Long_Float;
@@ -57,6 +61,7 @@ package body GEM.LTE.Primitives.Solution is
                        Client     : in Integer;
                        Count      : in Long_Integer;
                        Best       : out Boolean;
+                       BestClient : out Integer;
                        Percentage : out Integer) is
       begin
          if Metric >= Best_Metric then
@@ -73,6 +78,7 @@ package body GEM.LTE.Primitives.Solution is
          else
             Percentage := 0;
          end if;
+         BestClient := Best_Client;
       end Check;
 
       procedure Client (ID : out Integer) is
@@ -112,13 +118,20 @@ package body GEM.LTE.Primitives.Solution is
       return "Status: " & Client'Img & Cycle'Img & Metric'Img;
    end Status;
 
+   -----------------------------------
+
+
    task body Thread is
       ID : Integer;
+      Name : String := GEM.Getenv(Name => "CLIMATE_INDEX",
+                                  Default => "nino34_soi.txt");
+      Split : Boolean := not (GEM.Getenv(Name => "SPLIT_TRAINING",
+                                         Default => "") = "");
    begin
       Monitor.Client(ID);
-      Text_IO.Put_Line("Thread #" & ID'Img);
+      Text_IO.Put_Line(Name & " for Thread #" & ID'Img);
       -- Assume default for File_Name
-      Dipole_Model(ID => ID, Split_Training => TRUE);
+      Dipole_Model(ID => ID, File_Name=>Name, Split_Training => Split);
    end Thread;
 
    --
@@ -138,45 +151,52 @@ package body GEM.LTE.Primitives.Solution is
 
       function Impulse_Amplify is new Amplify(Impulse => Impulse);
 
-      Start_Time : Long_Float := 1880.0;
+      Start_Time : Long_Float := Data_Records(Data_Records'First).Date;
       Run_Time   : Long_Float := 136.6; -- used to truncate the file output
       Model      : Data_Pairs := Data_Records;
       -- Best_Model : Data_Pairs := Data_Records; -- perhaps needed if
       Best  : Boolean := False;
       Percentage : Integer;
+      Best_Client : Integer;
 
-      D : Shared.Param_S :=
-        (NLP    => LP'Length,
-         NLT    => LT'Length,
-         LP     => LP,
-         LT     => LT,
-         Offset => -0.002770852,
-         bg     => 0.037589404,
-         ImpA   => 13.57577452, -- 0.0,
-         ImpB   => 7.056004563, -- 1.22,
-         ImpC   => 20.25515663, -- 1.399,
-         ImpD   => 1.659027049, -- 1.2149,
-         mA     => 0.080599014,
-         mP     => -0.008405309,
-         mD     => -0.0021993,
-         fB     => -0.022004419, -- 10.761,
-         fC     => 1.469665629, -- 11.865,
-         fA     => 0.600532903, -- 7.55161
-         shiftT => 0.000001 );
-
+      D : Shared.Param_S := GEM.LTE.Primitives.Shared.Get;
+        --  (NLP    => LPQ'Length,
+        --   NLT    => LTQ'Length,
+        --   LP     => LPQ,
+        --   LT     => LTQ,
+        --   Offset => -0.002770852,
+        --   bg     => 0.037589404,
+        --   ImpA   => 13.57577452, -- 0.0,
+        --   ImpB   => 7.056004563, -- 1.22,
+        --   ImpC   => -20.25515663, -- 1.399,
+        --   ImpD   => -1.659027049, -- 1.2149,
+        --   mA     => 0.080599014,
+        --   mP     => -0.008405309,
+        --   mD     => -0.0021993,
+        --   fB     => -0.022004419, -- 10.761,
+        --   fC     => 1.469665629, -- 11.865,
+        --   fA     => 0.600532903, -- 7.55161
+        --   shiftT => 0.000001 );
+        --
       D0 : constant Shared.Param_S := D;  -- reference
+
+      ImpA : constant Integer := GEM.Getenv("IMPA", 9); -- Defaults for ENSO
+      ImpB : constant Integer := GEM.Getenv("IMPB", 10);
+      ImpC : constant Integer := GEM.Getenv("IMPC", 11);
+      ImpD : constant Integer := GEM.Getenv("IMPD", 0);
 
       function Impulse (Time : Long_Float) return Long_Float is
          Value : Long_Float;
-         Trunc : Integer := Integer((Time - Long_Float'Floor(Time))*1000.0);
+         -- Impulses will occur on a month for monthly data
+         Trunc : Integer := Integer((Time - Long_Float'Floor(Time))*12.0);
       begin
-         if Trunc = 775 then     -- ~October
+         if Trunc = ImpA then     --775 ~October
             Value := D.ImpA;
-         elsif Trunc = 858 then  -- ~November
+         elsif Trunc = ImpB then  --858 ~November
             Value := D.ImpB;
-         elsif Trunc = 942 then  -- ~December
+         elsif Trunc = ImpC then  --942 ~December
             Value := D.ImpC;
-         elsif Trunc = 25 then   -- ~January
+         elsif Trunc = ImpD then   --25 ~January
             Value := D.ImpD;
          else
             Value := 0.0;
@@ -202,11 +222,20 @@ package body GEM.LTE.Primitives.Solution is
          end loop;
       end Zero;
 
+      procedure Zero (Model : in out Modulations;
+                      Amplitude : in Long_Float ) is
+      begin
+         for I in Model'Range loop
+             Model(i).Amplitude := Amplitude;
+         end loop;
+      end Zero;
+
       der : Long_Float := 1.0 + D.mD - D.mA - D.mP; -- keeps the inegrator stable
       CorrCoeff, Old_CC : Long_Float := 0.0;
       CorrCoeffTest, Old_CCTest : Long_Float := 0.0;
       Progress_Cycle, Spread : Long_Float;
       Counter : Long_Integer := 0;
+      Num, First, Last : Integer;
 
       ------------------------------------------------------------------------
       -- This is close to a violtion of encapsulation, as we need a way
@@ -223,8 +252,10 @@ package body GEM.LTE.Primitives.Solution is
       ------------------------------------------------------------------------
 
    begin
+      Start_Time := Long_Float(Integer(Start_Time)); -- 1880.0;
       Old_CC := 0.0;
-      -- Zero(D.LP, 0.0001); -- ------------------!!
+      --Zero(D.LP, 0.0001); -- ------------------!!
+      --Zero(D.LT, 0.0); -- ------------------!!
       Walker.Reset;
 
       loop
@@ -240,21 +271,20 @@ package body GEM.LTE.Primitives.Solution is
          if Split_Training and Best then
           delay 0.001; -- don't do anything if in the lead, let others catch up.
          else
-          Model := LTE(
-           Forcing => IIR(
-             Raw  => Impulse_Amplify(
-               Raw    => FIR(
-                 Raw     => Tide_Sum(Template     => Data_Records,
-                                        Constituents => D.LP,
-                                        Ref_Time     => Start_Time + D.ShiftT,
-                                        Scaling      => 0.5),
-                 Behind  => D.fB,  -- -0.022004419,
-                 Current => D.fC,  -- 1.469665629,
-                 Ahead   => D.fA), -- 0.600532903,
-               Offset => D.Offset),
-                           lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
-                          iA => -0.0063, iB => 0.02, iC => 0.0068, iD => -0.00026),
-            Wave_Numbers => D.LT, Offset => 0.389, K0 => 0.169);
+            Model := LTE(Forcing => IIR(
+                         Raw  => Impulse_Amplify(
+                           Raw    => FIR(
+                             Raw     => Tide_Sum(Template     => Data_Records,
+                                                 Constituents => D.LP,
+                                                 Ref_Time     => Start_Time + D.ShiftT,
+                                                 Scaling      => 0.5),
+                             Behind  => D.fB,  -- -0.022004419,
+                             Current => D.fC,  -- 1.469665629,
+                             Ahead   => D.fA), -- 0.600532903,
+                           Offset => D.Offset),
+                         lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
+                         iA => -0.0063, iB => 0.02, iC => 0.0068, iD => -0.00026),
+                         Wave_Numbers => D.LT, Offset => 0.389, K0 => 0.169);
 
             -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
             Model := FIR(FIR(Model,0.333,0.333,0.333), 0.333, 0.333, 0.333);
@@ -262,33 +292,42 @@ package body GEM.LTE.Primitives.Solution is
 
          -- pragma Debug ( Dump(Model, Data_Records, Run_Time) );
 
-         CorrCoeff := CC( Model(20..840), Data_Records(20..840));
-         CorrCoeffTest := CC( Model(840..1640), Data_Records(840..1640));
-                 -- Xing( Model(20..1630), Data_Records(20..1630));
+         Num := Data_Records'Length;
+         First := Data_Records'First+12;
+         Last := Data_Records'Last-12;
+         if Split_Training then
+            CorrCoeff := CC( Model(First..Num/2), Data_Records(First..Num/2));
+            CorrCoeffTest := CC( Model(Num/2..Last), Data_Records(Num/2..Last));
+         else
+            CorrCoeff := CC( Model(First..Last), Data_Records(First..Last));
+         end if;
 
          -- Register the results with a monitor
          if Split_Training then
-            Monitor.Check(CorrCoeffTest, ID, Counter, Best, Percentage);
+            Monitor.Check(CorrCoeffTest, ID, Counter, Best, Best_Client, Percentage);
          else
-            Monitor.Check(CorrCoeff, ID, Counter, Best, Percentage);
+            Monitor.Check(CorrCoeff, ID, Counter, Best, Best_Client, Percentage);
+         end if;
+
+         if ID = Best_Client then
+            Counter := 1; -- no use penalizing thread in the lead
          end if;
 
          if CorrCoeff > Old_CC then
-            if Best then
-               Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);
-               -- delay 0.25;
-               -- Put_CC(CorrCoeffTest, 0, ID);
-            end if;
+            --if Best then
+            --   Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);
+            --end if;
             Old_CC := CorrCoeff;
             Old_CCTest := CorrCoeffTest;
          else
             Set := Keep;
          end if;
 
-         if (not Best) and Counter > 100_000 and Percentage < 99 then
+         if (not Best) and Counter > Maximum_Loops and Percentage < Threshold then
             Text_IO.Put_Line("Resetting" & ID'Img & Percentage'Img & "%");
             D := D0; -- load back reference model parameters
-            -- Zero(D.LP, 0.0001); ----------------!!!!!!!!!!!!!
+            --Zero(D.LP, 0.0001); ----------------!!!!!!!!!!!!!
+            --Zero(D.LT, 0.0); ----------------!!!!!!!!!!!!!
             Counter := 0;
             Old_CC := 0.0; --- I FORGOT THIS EARLIER
          end if;
@@ -297,14 +336,17 @@ package body GEM.LTE.Primitives.Solution is
 
       end loop;
       Monitor.Stop;
-      if Best then
+      if Best_Client = ID then
          Walker.Dump(Keep); -- Print results of last best evaluation,
+         Save(Model, Data_Records);
          -- Should also save to file
          if Split_Training then
             Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);
          else
             Put_CC(Old_CC, Old_CCTest, Counter, ID);
          end if;
+      else
+         Text_IO.Put_Line("Exited " & ID'Img);
       end if;
 
    end Dipole_Model;
