@@ -1,5 +1,3 @@
-
-
 with Text_IO;
 with Ada.Long_Float_Text_IO;
 with Ada.Numerics.Long_Elementary_Functions;
@@ -185,6 +183,7 @@ package body GEM.LTE.Primitives is
 
         J := J + 1;
       end loop;
+      -- assert the denominator that it doesn't hit zero
       return (Long_Float(n) * sum_XY - sum_X * sum_Y)
                   / sqrt((Long_Float(n) * squareSum_X - sum_X * sum_X)
                       * (Long_Float(n) * squareSum_Y - sum_Y * sum_Y));
@@ -232,17 +231,33 @@ package body GEM.LTE.Primitives is
       return not Running;
    end Halted;
 
+
+   -- protect the file from reentrancy
+
+   protected Safe is
+      procedure Save (Model, Data : in Data_Pairs;
+                      File_Name : in String);
+   end Safe;
+
+   protected body Safe is
+      procedure Save (Model, Data : in Data_Pairs;
+                      File_Name : in String) is
+         FT : Text_IO.File_Type;
+      begin
+         Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
+         for I in Data'Range loop
+            Text_IO.Put_Line(FT, Data(I).Date'Img & ", " & Model(I).Value'Img &
+                               ", " & Data(I).Value'Img);
+         end loop;
+         Text_IO.Close(FT);
+      end Save;
+   end Safe;
+
+
    procedure Save (Model, Data : in Data_Pairs;
                    File_Name : in String := "lte_results.csv") is
-      FT : Text_IO.File_Type;
    begin
-      Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
-      for I in Data'Range loop
-         Text_IO.Put_Line(FT, Data(I).Date'Img & ", " & Model(I).Value'Img &
-                                                 ", " & Data(I).Value'Img);
-      end loop;
-      Text_IO.Close(FT);
+      Safe.Save(Model,Data, File_Name);
    end Save;
-
 
 end GEM.LTE.Primitives;

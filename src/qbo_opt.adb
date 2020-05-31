@@ -13,31 +13,31 @@ procedure QBO_Opt is
          LT     => GEM.LTE.LTQ,
          Offset => -0.002770852,
          bg     => 0.037589404,
-         ImpA   => 13.57577452, -- 0.0,
-         ImpB   => 7.056004563, -- 1.22,
-         ImpC   => -20.25515663, -- 1.399,
-         ImpD   => -1.659027049, -- 1.2149,
+         ImpA   => 13.57577452,  -- This is the positive impulse per year
+         ImpB   => 7.056004563,  --  A & B
+         ImpC   => -20.25515663, -- This is the negative impulse per year
+         ImpD   => -1.659027049, --  C & D
          mA     => 0.080599014,
          mP     => -0.008405309,
          mD     => -0.0021993,
-         fB     => -0.022004419, -- 10.761,
-         fC     => 1.469665629, -- 11.865,
-         fA     => 0.600532903, -- 7.55161
+         fB     => -0.022004419,
+         fC     => 1.469665629,
+         fA     => 0.600532903,
+         -- k0     => 2.169,
          shiftT => 0.000001 );
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.Setenv("CLIMATE_INDEX", "qbo_30hPa.txt");
-   GEM.Setenv("IMPC", "3");
+   GEM.Setenv("IMPC", "3");  -- these are 6-months earlier than 9 & 10
    GEM.Setenv("IMPD", "4");
    GEM.LTE.Primitives.Shared.Put(D);
    GEM.LTE.Primitives.Solution.Start(N);
    for I in 1..Integer'Last loop
-      -- delay 1.0;
       -- The call to Status is blocking
       Text_IO.Put_Line(GEM.LTE.Primitives.Solution.Status & " #" & I'Img);
       exit when GEM.LTE.Primitives.Halted;
    end loop;
    Text_IO.Put_Line("Main exiting, flushing other tasks");
-   delay 3.0;
+   delay 5.0;
 
 end QBO_Opt;

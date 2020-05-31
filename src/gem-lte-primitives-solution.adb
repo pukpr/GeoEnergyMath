@@ -1,4 +1,3 @@
-
 with Text_IO;
 with Ada.Numerics.Long_Elementary_Functions;
 with Ada.Long_Float_Text_IO;
@@ -26,9 +25,6 @@ package body GEM.LTE.Primitives.Solution is
          delay 1.0; -- let them gradually start up
       end loop;
    end Start;
-
-   Maximum_Loops : constant Long_Integer := GEM.Getenv("MAXLOOPS", 100_000);
-   Threshold : constant Integer := GEM.Getenv("THRESHOLD", 99);
 
    --
    -- This is the passive monitoring object with mutual exclusve access
@@ -152,38 +148,27 @@ package body GEM.LTE.Primitives.Solution is
       function Impulse_Amplify is new Amplify(Impulse => Impulse);
 
       Start_Time : Long_Float := Data_Records(Data_Records'First).Date;
-      Run_Time   : Long_Float := 136.6; -- used to truncate the file output
       Model      : Data_Pairs := Data_Records;
-      -- Best_Model : Data_Pairs := Data_Records; -- perhaps needed if
       Best  : Boolean := False;
       Percentage : Integer;
       Best_Client : Integer;
 
       D : Shared.Param_S := GEM.LTE.Primitives.Shared.Get;
-        --  (NLP    => LPQ'Length,
-        --   NLT    => LTQ'Length,
-        --   LP     => LPQ,
-        --   LT     => LTQ,
-        --   Offset => -0.002770852,
-        --   bg     => 0.037589404,
-        --   ImpA   => 13.57577452, -- 0.0,
-        --   ImpB   => 7.056004563, -- 1.22,
-        --   ImpC   => -20.25515663, -- 1.399,
-        --   ImpD   => -1.659027049, -- 1.2149,
-        --   mA     => 0.080599014,
-        --   mP     => -0.008405309,
-        --   mD     => -0.0021993,
-        --   fB     => -0.022004419, -- 10.761,
-        --   fC     => 1.469665629, -- 11.865,
-        --   fA     => 0.600532903, -- 7.55161
-        --   shiftT => 0.000001 );
-        --
       D0 : constant Shared.Param_S := D;  -- reference
 
       ImpA : constant Integer := GEM.Getenv("IMPA", 9); -- Defaults for ENSO
       ImpB : constant Integer := GEM.Getenv("IMPB", 10);
       ImpC : constant Integer := GEM.Getenv("IMPC", 11);
       ImpD : constant Integer := GEM.Getenv("IMPD", 0);
+
+      Maximum_Loops : constant Long_Integer := GEM.Getenv("MAXLOOPS", 100_000);
+      Threshold : constant Integer := GEM.Getenv("THRESHOLD", 99);
+      Scaling : constant Long_Float := GEM.Getenv("SCALING", 0.5);
+      Spread_Min : constant Long_Float := GEM.Getenv("SPREAD_MIN", 0.000_000_1);
+      Spread_Max : constant Long_Float := GEM.Getenv("SPREAD_MAX", 0.1);
+      Spread_Cycle : constant Long_Float := GEM.Getenv("SPREAD_CYCLE", 1000.0);
+      Level : constant Long_Float := GEM.Getenv("LEVEL", 0.389);
+      K0 : constant Long_Float := GEM.Getenv("K0", 0.169);
 
       function Impulse (Time : Long_Float) return Long_Float is
          Value : Long_Float;
@@ -263,13 +248,14 @@ package body GEM.LTE.Primitives.Solution is
          delay 0.0; -- context switching point if multi-processing not avilable
          Progress_Cycle := Long_Float(Counter);
          -- This slowly oscillates to change the size of the step to hopefully
-         -- help it escape local minima, every 1000 cycles
-         Spread := 0.000_000_1 + 0.1*(1.0-LEF.Cos(Progress_Cycle/1000.0));
-         Walker.Markov(Set, Keep, Spread); -- 0.00000001
+         -- help it escape local minima, every N cycles
+         Spread := Spread_Min + Spread_Max*(1.0-LEF.Cos(Progress_Cycle/Spread_Cycle));
+         Walker.Markov(Set, Keep, Spread);
 
          -- Tidal constituents summed, amplified by impulse, and LTE modulated
          if Split_Training and Best then
-          delay 0.001; -- don't do anything if in the lead, let others catch up.
+            Save(Model, Data_Records);
+            delay 1.0; -- don't do anything if in the lead, let others catch up.
          else
             Model := LTE(Forcing => IIR(
                          Raw  => Impulse_Amplify(
@@ -277,14 +263,14 @@ package body GEM.LTE.Primitives.Solution is
                              Raw     => Tide_Sum(Template     => Data_Records,
                                                  Constituents => D.LP,
                                                  Ref_Time     => Start_Time + D.ShiftT,
-                                                 Scaling      => 0.5),
+                                                 Scaling      => Scaling),
                              Behind  => D.fB,  -- -0.022004419,
                              Current => D.fC,  -- 1.469665629,
                              Ahead   => D.fA), -- 0.600532903,
                            Offset => D.Offset),
                          lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
                          iA => -0.0063, iB => 0.02, iC => 0.0068, iD => -0.00026),
-                         Wave_Numbers => D.LT, Offset => 0.389, K0 => 0.169);
+                         Wave_Numbers => D.LT, Offset => Level, K0 => K0);
 
             -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
             Model := FIR(FIR(Model,0.333,0.333,0.333), 0.333, 0.333, 0.333);
@@ -326,7 +312,7 @@ package body GEM.LTE.Primitives.Solution is
          if (not Best) and Counter > Maximum_Loops and Percentage < Threshold then
             Text_IO.Put_Line("Resetting" & ID'Img & Percentage'Img & "%");
             D := D0; -- load back reference model parameters
-            --Zero(D.LP, 0.0001); ----------------!!!!!!!!!!!!!
+            -- Zero(D.LP, 0.0001); ----------------!!!!!!!!!!!!!
             --Zero(D.LT, 0.0); ----------------!!!!!!!!!!!!!
             Counter := 0;
             Old_CC := 0.0; --- I FORGOT THIS EARLIER

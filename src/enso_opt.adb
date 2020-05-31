@@ -23,6 +23,7 @@ procedure ENSO_Opt is
          fB     => -0.022004419, -- 10.761,
          fC     => 1.469665629, -- 11.865,
          fA     => 0.600532903, -- 7.55161
+         -- k0     => 0.169,
          shiftT => 0.000001 );
 begin
    Text_IO.Put_Line(N'Img & " processors available");
@@ -35,6 +36,6 @@ begin
       exit when GEM.LTE.Primitives.Halted;
    end loop;
    Text_IO.Put_Line("Main exiting, flushing other tasks");
-   delay 3.0;
+   delay 5.0;
 
 end ENSO_Opt;

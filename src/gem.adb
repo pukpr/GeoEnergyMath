@@ -2,15 +2,8 @@ with Ada.Environment_Variables;
 
 package body GEM is
 
- function Getenv (Name : in String; Default : in String) return String is
-   begin
-      --if Ada.Environment_Variables.Exists (Name) then
-      --   return Ada.Environment_Variables.Value (Name);
-      --else
-      --   return Default;
-      --end if;
-      return Ada.Environment_Variables.Value (Name, Default);
-   end Getenv;
+   function Getenv (Name : in String; Default : in String) return String renames
+     Ada.Environment_Variables.Value;
 
    function Getenv (Name : in String; Default : in Integer) return Integer is
    begin
@@ -41,6 +34,5 @@ package body GEM is
    begin
       Ada.Environment_Variables.Clear(Name);
    end Clear;
-
 
 end GEM;
