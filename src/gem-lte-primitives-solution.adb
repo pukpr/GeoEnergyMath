@@ -144,6 +144,7 @@ package body GEM.LTE.Primitives.Solution is
       Data_Records : Data_Pairs := Make_Data(File_Name);
 
       function Impulse (Time : Long_Float) return Long_Float;
+      function Impulse_Sin (Time : Long_Float) return Long_Float;
 
       function Impulse_Amplify is new Amplify(Impulse => Impulse);
 
@@ -188,6 +189,16 @@ package body GEM.LTE.Primitives.Solution is
          end if;
          return Value + D.bg;
       end Impulse;
+
+      function Impulse_Sin (Time : Long_Float) return Long_Float is
+         Pi : Long_Float := Ada.Numerics.Pi;
+         Value : Long_Float;
+         use Ada.Numerics.Long_Elementary_Functions;
+         -- scale*(COS(2*PI()*($E2+ip)))^2+$D$17*(COS(2*PI()*($E2+ip)))^3
+      begin
+         Value := D.ImpA*(COS(2.0*Pi*(Time+D.ImpB)))**2+D.ImpC*(COS(2.0*Pi*(Time+D.ImpB)))**3;
+         return Value + D.bg;
+      end Impulse_Sin;
 
       procedure Put_CC (Val1, Val2 : in Long_Float;
                         Counter : in Long_Integer;
