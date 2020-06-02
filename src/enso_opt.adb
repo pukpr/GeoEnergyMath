@@ -20,13 +20,16 @@ procedure ENSO_Opt is
          mA     => 0.080599014,
          mP     => -0.008405309,
          mD     => -0.0021993,
+         shiftT => 0.000001,
          fB     => -0.022004419, -- 10.761,
          fC     => 1.469665629, -- 11.865,
          fA     => 0.600532903, -- 7.55161
-         -- k0     => 0.169,
-         shiftT => 0.000001 );
+         k0     => 0.169,
+         level  => 0.0,
+         init   => 0.0063);
 begin
    Text_IO.Put_Line(N'Img & " processors available");
+   GEM.LTE.Primitives.Shared.Load(D); -- if available
    GEM.LTE.Primitives.Shared.Put(D);
    GEM.LTE.Primitives.Solution.Start(N);
    for I in 1..Integer'Last loop

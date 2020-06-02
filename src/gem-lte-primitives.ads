@@ -59,6 +59,9 @@ package GEM.LTE.Primitives is
    -- Zero-crossing metric
    function Xing (X, Y : in Data_Pairs) return Long_Float;
 
+   -- RMS
+   function RMS (X, Y : in Data_Pairs) return Long_Float;
+
    -- Dumps to stdIO all the data up to time corresponding to run_time
    procedure Dump (Model, Data : in Data_Pairs;
                    Run_Time : Long_Float := 200.0);

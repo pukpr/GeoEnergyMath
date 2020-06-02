@@ -208,6 +208,19 @@ package body GEM.LTE.Primitives is
       return sum_XY / sum_absXY;
    end Xing;
 
+  function RMS (X, Y : in Data_Pairs) return Long_Float is
+      N : Integer := X'Length;
+      sum_XY : Long_Float := 0.0;
+      use Ada.Numerics.Long_Elementary_Functions;
+      J : Integer := Y'First;
+   begin
+      for I in X'Range loop
+        -- sum of (X[i] - Y[i])^2
+        sum_XY := sum_XY + (X(i).Value - Y(j).Value)**2;
+        J := J + 1;
+      end loop;
+      return 1000.0/sqrt(sum_XY);
+   end RMS;
 
    procedure Dump (Model, Data : in Data_Pairs;
                   Run_Time : Long_Float := 200.0) is
@@ -231,8 +244,9 @@ package body GEM.LTE.Primitives is
       return not Running;
    end Halted;
 
-
+   --
    -- protect the file from reentrancy
+   --
 
    protected Safe is
       procedure Save (Model, Data : in Data_Pairs;
@@ -252,7 +266,6 @@ package body GEM.LTE.Primitives is
          Text_IO.Close(FT);
       end Save;
    end Safe;
-
 
    procedure Save (Model, Data : in Data_Pairs;
                    File_Name : in String := "lte_results.csv") is

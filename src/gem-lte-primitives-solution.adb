@@ -146,7 +146,7 @@ package body GEM.LTE.Primitives.Solution is
       function Impulse (Time : Long_Float) return Long_Float;
       function Impulse_Sin (Time : Long_Float) return Long_Float;
 
-      function Impulse_Amplify is new Amplify(Impulse => Impulse);
+      function Impulse_Amplify is new Amplify(Impulse => Impulse_Sin);
 
       Start_Time : Long_Float := Data_Records(Data_Records'First).Date;
       Model      : Data_Pairs := Data_Records;
@@ -168,8 +168,19 @@ package body GEM.LTE.Primitives.Solution is
       Spread_Min : constant Long_Float := GEM.Getenv("SPREAD_MIN", 0.000_000_1);
       Spread_Max : constant Long_Float := GEM.Getenv("SPREAD_MAX", 0.1);
       Spread_Cycle : constant Long_Float := GEM.Getenv("SPREAD_CYCLE", 1000.0);
-      Level : constant Long_Float := GEM.Getenv("LEVEL", 0.389);
-      K0 : constant Long_Float := GEM.Getenv("K0", 0.169);
+      Catchup : constant Boolean := GEM.Getenv("THRESHOLD_ACTION", "RESTART") = "CATCHUP";
+      --K0 : constant Long_Float := GEM.Getenv("K0", 0.169);
+      RMS_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "RMS";
+      Sin_Impulse : constant Boolean := GEM.Getenv("IMPULSE", "DELTA") = "SIN";
+
+      function Metric (X, Y : in Data_Pairs) return Long_Float is
+      begin
+         if RMS_Metric then
+            return RMS(X,Y)*CC(X,Y);
+         else
+            return CC(X,Y);
+         end if;
+      end Metric;
 
       function Impulse (Time : Long_Float) return Long_Float is
          Value : Long_Float;
@@ -194,8 +205,11 @@ package body GEM.LTE.Primitives.Solution is
          Pi : Long_Float := Ada.Numerics.Pi;
          Value : Long_Float;
          use Ada.Numerics.Long_Elementary_Functions;
-         -- scale*(COS(2*PI()*($E2+ip)))^2+$D$17*(COS(2*PI()*($E2+ip)))^3
+         -- scale*(COS(2*PI*(E2+ip)))^2+D17*(COS(2*PI*(E2+ip)))^3
       begin
+         if not Sin_Impulse then
+            return Impulse(Time);
+         end if;
          Value := D.ImpA*(COS(2.0*Pi*(Time+D.ImpB)))**2+D.ImpC*(COS(2.0*Pi*(Time+D.ImpB)))**3;
          return Value + D.bg;
       end Impulse_Sin;
@@ -253,6 +267,7 @@ package body GEM.LTE.Primitives.Solution is
       --Zero(D.LP, 0.0001); -- ------------------!!
       --Zero(D.LT, 0.0); -- ------------------!!
       Walker.Reset;
+      Text_IO.Put("Catchup mode enabled:" & Boolean'Image(Catchup) & " => ");
 
       loop
          Counter := Counter + 1;
@@ -280,8 +295,8 @@ package body GEM.LTE.Primitives.Solution is
                              Ahead   => D.fA), -- 0.600532903,
                            Offset => D.Offset),
                          lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
-                         iA => -0.0063, iB => 0.02, iC => 0.0068, iD => -0.00026),
-                         Wave_Numbers => D.LT, Offset => Level, K0 => K0);
+                         iA => D.init, iB => 0.0, iC => 0.0, iD => 0.0),
+                         Wave_Numbers => D.LT, Offset => D.level, K0 => D.K0);
 
             -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
             Model := FIR(FIR(Model,0.333,0.333,0.333), 0.333, 0.333, 0.333);
@@ -293,10 +308,10 @@ package body GEM.LTE.Primitives.Solution is
          First := Data_Records'First+12;
          Last := Data_Records'Last-12;
          if Split_Training then
-            CorrCoeff := CC( Model(First..Num/2), Data_Records(First..Num/2));
-            CorrCoeffTest := CC( Model(Num/2..Last), Data_Records(Num/2..Last));
+            CorrCoeff := Metric( Model(First..Num/2), Data_Records(First..Num/2));
+            CorrCoeffTest := Metric( Model(Num/2..Last), Data_Records(Num/2..Last));
          else
-            CorrCoeff := CC( Model(First..Last), Data_Records(First..Last));
+            CorrCoeff := Metric( Model(First..Last), Data_Records(First..Last));
          end if;
 
          -- Register the results with a monitor
@@ -316,13 +331,21 @@ package body GEM.LTE.Primitives.Solution is
             --end if;
             Old_CC := CorrCoeff;
             Old_CCTest := CorrCoeffTest;
+            Keep := Set;
+            if CatchUp then  -- save it for other threads to reset from
+               GEM.LTE.Primitives.Shared.Put(D);
+            end if;
          else
             Set := Keep;
          end if;
 
          if (not Best) and Counter > Maximum_Loops and Percentage < Threshold then
             Text_IO.Put_Line("Resetting" & ID'Img & Percentage'Img & "%");
-            D := D0; -- load back reference model parameters
+            if CatchUp then
+               D := GEM.LTE.Primitives.Shared.Get;
+            else -- Restart
+               D := D0; -- load back reference model parameters
+            end if;
             -- Zero(D.LP, 0.0001); ----------------!!!!!!!!!!!!!
             --Zero(D.LT, 0.0); ----------------!!!!!!!!!!!!!
             Counter := 0;
@@ -334,6 +357,9 @@ package body GEM.LTE.Primitives.Solution is
       end loop;
       Monitor.Stop;
       if Best_Client = ID then
+         Set := Keep;
+         D := D;
+         GEM.LTE.Primitives.Shared.Save(D);
          Walker.Dump(Keep); -- Print results of last best evaluation,
          Save(Model, Data_Records);
          -- Should also save to file

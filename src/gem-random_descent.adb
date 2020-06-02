@@ -23,7 +23,7 @@ package body GEM.Random_Descent is
       Adjust : Long_Float;
       I : Set_Index := DR.Random(D);
    begin
-      Ref := Set;
+      Ref := Set; -- keep in case of error?
       --for I in Set'Range loop -- a real gradient descent would do all at once
          if not Fixed(Set(I)) then
             Adjust := 1.0 + Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
@@ -35,8 +35,8 @@ package body GEM.Random_Descent is
    procedure Dump(Set : in LF_Array) is
    begin
       for I in Set'Range loop
-         Ada.Long_Float_Text_IO.Put(Set(I), Fore=>4, Aft=>8, Exp=>0);
-         Text_IO.New_Line;
+         Ada.Long_Float_Text_IO.Put(Set(I), Fore=>4, Aft=>11, Exp=>0);
+         Text_IO.Put_Line(",");
       end loop;
    end Dump;
 

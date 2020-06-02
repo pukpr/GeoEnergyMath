@@ -22,7 +22,9 @@ package GEM.LTE.Primitives.Shared is
          fB     : Long_Float;
          fC     : Long_Float;
          fA     : Long_Float;
-         -- k0     : Long_Float;
+         k0     : Long_Float;
+         level  : Long_Float;
+         init   : Long_Float;
 
          LP     : Long_Periods(1..NLP);
          LT     : Modulations(1..NLT);
@@ -40,5 +42,13 @@ package GEM.LTE.Primitives.Shared is
    procedure Put (P : in Param_S);
 
    function Get return Param_S;
+
+   --
+   -- from a file -- name of file executable
+   --
+   procedure Save (P : in Param_S);
+
+   procedure Load (P : in out Param_S);
+
 
 end GEM.LTE.Primitives.Shared;
