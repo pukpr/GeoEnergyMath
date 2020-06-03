@@ -1,0 +1,17 @@
+export IMPA=399
+export IMPB=400
+export IMPULSE=SIN
+export CLIMATE_INDEX=mjo.txt
+export SAMPLING=365.0
+export THRESHOLD=90
+export THRESHOLD=99
+export THRESHOLD_ACTION=CATCHUP
+export METRIC=RMS
+export METRIC=CC
+export SPREAD_MIN=0.0000001
+export SPREAD_MAX=0.1
+export MAXLOOPS=100000
+export SPLIT_TRAINING=1
+unset SPLIT_TRAINING
+## export CLIMATE_INDEX=nino34_soi.txt
+

@@ -31,11 +31,17 @@ begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.LTE.Primitives.Shared.Load(D); -- if available
    GEM.LTE.Primitives.Shared.Put(D);
-   GEM.LTE.Primitives.Solution.Start(N);
+   GEM.LTE.Primitives.Solution.Start(D.NLP,D.NLT,N);
    for I in 1..Integer'Last loop
       -- delay 1.0;
       -- The call to Status is blocking
-      Text_IO.Put_Line(GEM.LTE.Primitives.Solution.Status & " #" & I'Img);
+      declare
+         S : String := GEM.LTE.Primitives.Solution.Status;
+      begin
+         if I mod 100 = 0 then
+            Text_IO.Put_Line(S & " #" & I'Img);
+         end if;
+      end;
       exit when GEM.LTE.Primitives.Halted;
    end loop;
    Text_IO.Put_Line("Main exiting, flushing other tasks");

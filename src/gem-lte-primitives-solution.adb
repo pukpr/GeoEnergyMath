@@ -5,23 +5,26 @@ with GEM.Random_Descent;
 with GNAT.Ctrl_C;
 with System.Task_Info;
 with GEM.LTE.Primitives.Shared;
+with Ada.Exceptions;
 
 package body GEM.LTE.Primitives.Solution is
 
    -- Map task threads to multicore processors if available
-   task type Thread(CPU : System.Task_Info.CPU_Number) is
+   task type Thread(CPU : System.Task_Info.CPU_Number;
+                    N_Tides, N_Modulations : Integer) is
      pragma Task_Info (new System.Task_Info.Thread_Attributes'(CPU=>CPU));
    end Thread;
    type Thread_Access is access Thread;
 
    -- Start the task threads with a remote handler to cleanly stopping mechanism
-   procedure Start (Number_of_Threads : Positive := 1) is
+   procedure Start (N_Tides, N_Modulations : in Integer;
+                    Number_of_Threads : Positive := 1) is
       TA : Thread_Access;
       use System.Task_Info;
    begin
      GNAT.Ctrl_C.Install_Handler (Handler => GEM.LTE.Primitives.Stop'Access);
      for I in 0..Number_of_Threads-1 loop
-         TA := new Thread (CPU_Number(I));
+         TA := new Thread (CPU=>CPU_Number(I), N_Tides=>N_Tides, N_Modulations=>N_Modulations);
          delay 1.0; -- let them gradually start up
       end loop;
    end Start;
@@ -125,9 +128,11 @@ package body GEM.LTE.Primitives.Solution is
                                          Default => "") = "");
    begin
       Monitor.Client(ID);
-      Text_IO.Put_Line(Name & " for Thread #" & ID'Img);
+      Text_IO.Put_Line(Name & " for Thread #" & ID'Img & Thread.CPU'Img);
       -- Assume default for File_Name
-      Dipole_Model(ID => ID, File_Name=>Name, Split_Training => Split);
+      Dipole_Model(N_Tides=>Thread.N_Tides,
+                   N_Modulations=>Thread.N_Modulations,
+                   ID => ID, File_Name=>Name, Split_Training => Split);
    end Thread;
 
    --
@@ -135,7 +140,8 @@ package body GEM.LTE.Primitives.Solution is
    -- with default parameters that fit to an ENSO NINO34/SOI data set
    -- at a CC of > 0.83.
    --
-   procedure Dipole_Model (ID : in Integer := 0;
+   procedure Dipole_Model (N_Tides, N_Modulations : in Integer;
+                           ID : in Integer := 0;
                            File_Name : in String := "nino34_soi.txt";
                            Split_Training : in BOOLEAN := FALSE) is
       package LEF renames Ada.Numerics.Long_Elementary_Functions;
@@ -154,7 +160,7 @@ package body GEM.LTE.Primitives.Solution is
       Percentage : Integer;
       Best_Client : Integer;
 
-      D : Shared.Param_S := GEM.LTE.Primitives.Shared.Get;
+      D : Shared.Param_S(N_Tides, N_Modulations) := GEM.LTE.Primitives.Shared.Get(N_Tides, N_Modulations);
       D0 : constant Shared.Param_S := D;  -- reference
 
       ImpA : constant Integer := GEM.Getenv("IMPA", 9); -- Defaults for ENSO
@@ -172,6 +178,7 @@ package body GEM.LTE.Primitives.Solution is
       --K0 : constant Long_Float := GEM.Getenv("K0", 0.169);
       RMS_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "RMS";
       Sin_Impulse : constant Boolean := GEM.Getenv("IMPULSE", "DELTA") = "SIN";
+      Sampling_Per_Year : constant Long_Float := GEM.Getenv("SAMPLING", 12.0);
 
       function Metric (X, Y : in Data_Pairs) return Long_Float is
       begin
@@ -185,7 +192,7 @@ package body GEM.LTE.Primitives.Solution is
       function Impulse (Time : Long_Float) return Long_Float is
          Value : Long_Float;
          -- Impulses will occur on a month for monthly data
-         Trunc : Integer := Integer((Time - Long_Float'Floor(Time))*12.0);
+         Trunc : Integer := Integer((Time - Long_Float'Floor(Time))*Sampling_Per_Year);
       begin
          if Trunc = ImpA then     --775 ~October
             Value := D.ImpA;
@@ -210,7 +217,8 @@ package body GEM.LTE.Primitives.Solution is
          if not Sin_Impulse then
             return Impulse(Time);
          end if;
-         Value := D.ImpA*(COS(2.0*Pi*(Time+D.ImpB)))**2+D.ImpC*(COS(2.0*Pi*(Time+D.ImpB)))**3;
+         -- uisng the impA & impB env vars as odd & even powers, since they won't be used for impulse
+         Value := D.ImpA*(COS(2.0*Pi*(Time+D.ImpB)))**ImpA+D.ImpC*(COS(2.0*Pi*(Time+D.ImpB)))**ImpB;
          return Value + D.bg;
       end Impulse_Sin;
 
@@ -245,7 +253,9 @@ package body GEM.LTE.Primitives.Solution is
       CorrCoeffTest, Old_CCTest : Long_Float := 0.0;
       Progress_Cycle, Spread : Long_Float;
       Counter : Long_Integer := 0;
-      Num, First, Last : Integer;
+      First : Integer := GEM.Getenv("TRAIN_START", Data_Records'First+12);
+      Last : Integer := GEM.Getenv("TRAIN_END", Data_Records'Last-12);
+      Mid : Integer := (First+Last)/2;
 
       ------------------------------------------------------------------------
       -- This is close to a violtion of encapsulation, as we need a way
@@ -267,7 +277,7 @@ package body GEM.LTE.Primitives.Solution is
       --Zero(D.LP, 0.0001); -- ------------------!!
       --Zero(D.LT, 0.0); -- ------------------!!
       Walker.Reset;
-      Text_IO.Put("Catchup mode enabled:" & Boolean'Image(Catchup) & " => ");
+      Text_IO.Put_Line("Catchup mode enabled:" & Boolean'Image(Catchup) );
 
       loop
          Counter := Counter + 1;
@@ -304,12 +314,12 @@ package body GEM.LTE.Primitives.Solution is
 
          -- pragma Debug ( Dump(Model, Data_Records, Run_Time) );
 
-         Num := Data_Records'Length;
-         First := Data_Records'First+12;
-         Last := Data_Records'Last-12;
+         --Num := Data_Records'Length;
+         --First := Data_Records'First+12;
+         --Last := Data_Records'Last-12;
          if Split_Training then
-            CorrCoeff := Metric( Model(First..Num/2), Data_Records(First..Num/2));
-            CorrCoeffTest := Metric( Model(Num/2..Last), Data_Records(Num/2..Last));
+            CorrCoeff := Metric( Model(First..Mid), Data_Records(First..Mid));
+            CorrCoeffTest := Metric( Model(Mid..Last), Data_Records(Mid..Last));
          else
             CorrCoeff := Metric( Model(First..Last), Data_Records(First..Last));
          end if;
@@ -342,7 +352,7 @@ package body GEM.LTE.Primitives.Solution is
          if (not Best) and Counter > Maximum_Loops and Percentage < Threshold then
             Text_IO.Put_Line("Resetting" & ID'Img & Percentage'Img & "%");
             if CatchUp then
-               D := GEM.LTE.Primitives.Shared.Get;
+               D := GEM.LTE.Primitives.Shared.Get(N_Tides, N_Modulations);
             else -- Restart
                D := D0; -- load back reference model parameters
             end if;
@@ -371,6 +381,11 @@ package body GEM.LTE.Primitives.Solution is
       else
          Text_IO.Put_Line("Exited " & ID'Img);
       end if;
+
+
+   exception
+      when E : others =>
+         Text_IO.Put_Line ("Error: " & Ada.Exceptions.Exception_Information(E));
 
    end Dipole_Model;
 

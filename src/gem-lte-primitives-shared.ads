@@ -41,7 +41,7 @@ package GEM.LTE.Primitives.Shared is
    --
    procedure Put (P : in Param_S);
 
-   function Get return Param_S;
+   function Get(N_Tides, N_Modulations: in Integer) return Param_S;
 
    --
    -- from a file -- name of file executable

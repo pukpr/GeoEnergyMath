@@ -2,14 +2,16 @@
 package GEM.LTE.Primitives.Solution is
 
    -- Processing thread starter
-   procedure Start (Number_of_Threads : Positive := 1);
+   procedure Start (N_Tides, N_Modulations : in Integer;
+                    Number_of_Threads : Positive := 1);
 
    -- For a monitoring thread to indicate the current status
    -- Will block until the optmizer is incremented
    function Status return String;
 
    -- can call w/o multiprocessing, set ID=0
-   procedure Dipole_Model (ID : in Integer := 0;
+   procedure Dipole_Model (N_Tides, N_Modulations : in Integer;
+                           ID : in Integer := 0;
                            File_Name : in String := "nino34_soi.txt";
                            Split_Training : in BOOLEAN := FALSE);
 

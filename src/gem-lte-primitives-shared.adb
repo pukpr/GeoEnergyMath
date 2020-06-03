@@ -5,11 +5,11 @@ with Ada.Text_IO;
 package body GEM.LTE.Primitives.Shared is
 
    -- Can only access the info via a pointer
-   type Param_P is access Param_S;
+   type Param_P is access all Param_S;
 
    protected Server is
       procedure Put (P : in Param_S);
-      entry Get (P : out Param_P);
+      entry Get (P : in out Param_S);
    private
       Available : Boolean := False;
       Params : Param_P;
@@ -39,9 +39,9 @@ package body GEM.LTE.Primitives.Shared is
       -- Get --
       ---------
 
-      entry Get (P : out Param_P) when Available is
+      entry Get (P : in out Param_S) when Available is
       begin
-         P := Params;
+         P := Params.all;
       end Get;
 
    end Server;
@@ -52,11 +52,11 @@ package body GEM.LTE.Primitives.Shared is
       Server.Put (P);
    end Put;
 
-   function Get return Param_S is
-      P_pointer : Param_P;
+   function Get (N_Tides, N_Modulations : in Integer) return Param_S is
+      P : Param_S(N_Tides, N_Modulations);
    begin
-      Server.Get (P_Pointer);
-      return P_Pointer.all;
+      Server.Get (P);
+      return P;
    end Get;
 
    procedure Save (P : in Param_S) is
