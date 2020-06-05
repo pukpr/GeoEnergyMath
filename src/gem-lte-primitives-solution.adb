@@ -6,6 +6,7 @@ with GNAT.Ctrl_C;
 with System.Task_Info;
 with GEM.LTE.Primitives.Shared;
 with Ada.Exceptions;
+with Gnat.Traceback.Symbolic;
 
 package body GEM.LTE.Primitives.Solution is
 
@@ -29,6 +30,8 @@ package body GEM.LTE.Primitives.Solution is
       end loop;
    end Start;
 
+   Worst_Case : constant := 0.001;
+
    --
    -- This is the passive monitoring object with mutual exclusve access
    -- to the best metric provided by the executing threads
@@ -48,7 +51,7 @@ package body GEM.LTE.Primitives.Solution is
       procedure Stop;
    private
       --  Value of current best metric stored internally
-      Best_Metric  : Long_Float := 0.0;
+      Best_Metric  : Long_Float := Worst_Case; -- so doesn't cause overflow for %
       Client_Index : Integer := 1;
       Waiting : Boolean := TRUE; -- triggers status only if value changes
       Best_Client : Integer := -1;
@@ -72,12 +75,17 @@ package body GEM.LTE.Primitives.Solution is
          else
             Best := False;
          end if;
-         if Best_Metric > 0.0 then
+         if Best_Metric > Worst_Case then
             Percentage := Integer(100.0*Metric/Best_Metric);
          else
             Percentage := 0;
          end if;
          BestClient := Best_Client;
+      exception
+         when Constraint_Error =>
+            Best := False;
+            BestClient := Best_Client;
+            Percentage := 0;
       end Check;
 
       procedure Client (ID : out Integer) is
@@ -227,8 +235,8 @@ package body GEM.LTE.Primitives.Solution is
                         Thread  : in Integer) is
       begin
          Text_IO.Put( "CC=" );
-         Ada.Long_Float_Text_IO.Put(Val1, Fore=>4, Aft=>8, Exp=>0);
-         Ada.Long_Float_Text_IO.Put(Val2, Fore=>4, Aft=>8, Exp=>0);
+         Ada.Long_Float_Text_IO.Put(Val1, Fore=>4, Aft=>10, Exp=>0);
+         Ada.Long_Float_Text_IO.Put(Val2, Fore=>4, Aft=>10, Exp=>0);
          Text_IO.Put_Line("  " & Thread'Img & Counter'Img);
       end Put_CC;
 
@@ -274,8 +282,6 @@ package body GEM.LTE.Primitives.Solution is
    begin
       Start_Time := Long_Float(Integer(Start_Time)); -- 1880.0;
       Old_CC := 0.0;
-      --Zero(D.LP, 0.0001); -- ------------------!!
-      --Zero(D.LT, 0.0); -- ------------------!!
       Walker.Reset;
       Text_IO.Put_Line("Catchup mode enabled:" & Boolean'Image(Catchup) );
 
@@ -314,9 +320,6 @@ package body GEM.LTE.Primitives.Solution is
 
          -- pragma Debug ( Dump(Model, Data_Records, Run_Time) );
 
-         --Num := Data_Records'Length;
-         --First := Data_Records'First+12;
-         --Last := Data_Records'Last-12;
          if Split_Training then
             CorrCoeff := Metric( Model(First..Mid), Data_Records(First..Mid));
             CorrCoeffTest := Metric( Model(Mid..Last), Data_Records(Mid..Last));
@@ -356,10 +359,8 @@ package body GEM.LTE.Primitives.Solution is
             else -- Restart
                D := D0; -- load back reference model parameters
             end if;
-            -- Zero(D.LP, 0.0001); ----------------!!!!!!!!!!!!!
-            --Zero(D.LT, 0.0); ----------------!!!!!!!!!!!!!
             Counter := 0;
-            Old_CC := 0.0; --- I FORGOT THIS EARLIER
+            Old_CC := 0.0;
          end if;
 
          exit when Halted;
@@ -371,8 +372,7 @@ package body GEM.LTE.Primitives.Solution is
          D := D;
          GEM.LTE.Primitives.Shared.Save(D);
          Walker.Dump(Keep); -- Print results of last best evaluation,
-         Save(Model, Data_Records);
-         -- Should also save to file
+         Save(Model, Data_Records);    -- Should also save to file
          if Split_Training then
             Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);
          else
@@ -386,6 +386,8 @@ package body GEM.LTE.Primitives.Solution is
    exception
       when E : others =>
          Text_IO.Put_Line ("Error: " & Ada.Exceptions.Exception_Information(E));
+         -- The following may need a debug-specifi compiler switch to activate
+         Text_IO.Put_Line (Gnat.Traceback.Symbolic.Symbolic_Traceback(E));
 
    end Dipole_Model;
 

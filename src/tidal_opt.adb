@@ -3,30 +3,30 @@ with System.Task_Info;
 with GEM.LTE.Primitives.Solution;
 with GEM.LTE.Primitives.Shared;
 with Text_IO;
-procedure ENSO_Opt is
+procedure Tidal_Opt is
    N :  Positive := System.Task_Info.Number_Of_Processors;
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
-        (NLP    => GEM.LTE.LP'Length,
-         NLT    => GEM.LTE.LTM'Length,
-         LP     => GEM.LTE.LP,
-         LT     => GEM.LTE.LTM,
-         Offset => -0.002770852,
-         bg     => 0.037589404,
-         ImpA   => 13.57577452, -- 0.0,
-         ImpB   => 7.056004563, -- 1.22,
-         ImpC   => 20.25515663, -- 1.399,
-         ImpD   => 1.659027049, -- 1.2149,
-         mA     => 0.080599014,
-         mP     => -0.008405309,
-         mD     => -0.0021993,
+        (NLP    => GEM.LTE.SP'Length,
+         NLT    => GEM.LTE.LT0'Length,
+         LP     => GEM.LTE.SP,
+         LT     => GEM.LTE.LT0,
+         Offset => 0.001,
+         bg     => 0.9,
+         ImpA   => 0.0, -- 0.0,
+         ImpB   => 0.0, -- 1.22,
+         ImpC   => 0.0, -- 1.399,
+         ImpD   => 0.0, -- 1.2149,
+         mA     => 0.49,
+         mP     => 0.0,
+         mD     => 0.0,
          shiftT => 0.000001,
-         fB     => -0.022004419, -- 10.761,
-         fC     => 1.469665629, -- 11.865,
-         fA     => 0.600532903, -- 7.55161
-         k0     => 0.169,
+         fB     => 0.0, -- 10.761,
+         fC     => 0.8, -- 11.865,
+         fA     => 0.0, -- 7.55161
+         k0     => 0.9,
          level  => 0.0,
-         init   => 0.0063);
+         init   => 0.01);
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.LTE.Primitives.Shared.Load(D); -- if available
@@ -47,4 +47,4 @@ begin
    Text_IO.Put_Line("Main exiting, flushing other tasks");
    delay 5.0;
 
-end ENSO_Opt;
+end Tidal_Opt;

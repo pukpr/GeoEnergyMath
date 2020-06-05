@@ -153,6 +153,11 @@ package body GEM.LTE.Primitives is
             return True;
          end if;
       end loop;
+      for I in SP'Range loop
+         if Value = SP(I).Period then
+            return True;
+         end if;
+      end loop;
       return False;
    end Is_Fixed;
 
@@ -166,6 +171,7 @@ package body GEM.LTE.Primitives is
       sum_X, sum_Y, sum_XY, squareSum_X, squareSum_Y : Long_Float := 0.0;
       use Ada.Numerics.Long_Elementary_Functions;
       J : Integer := Y'First;
+      Denominator : Long_Float;
    begin
       for I in X'Range loop
         -- sum of elements of array X.
@@ -184,9 +190,13 @@ package body GEM.LTE.Primitives is
         J := J + 1;
       end loop;
       -- assert the denominator that it doesn't hit zero
-      return (Long_Float(n) * sum_XY - sum_X * sum_Y)
-                  / sqrt((Long_Float(n) * squareSum_X - sum_X * sum_X)
-                      * (Long_Float(n) * squareSum_Y - sum_Y * sum_Y));
+      Denominator := (Long_Float(n) * squareSum_X - sum_X * sum_X)
+                    * (Long_Float(n) * squareSum_Y - sum_Y * sum_Y);
+      if Denominator <= 0.0 then
+         return 0.0;
+      else
+         return (Long_Float(n) * sum_XY - sum_X * sum_Y) / Sqrt(Denominator);
+      end if;
    end CC;
 
    -- A zero-crossing metric that is faster than CC which can be used to

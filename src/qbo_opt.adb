@@ -26,10 +26,10 @@ procedure QBO_Opt is
          fA     => 0.600532903,
          k0     => 2.169,
          level  => 0.5,
-         init   => 1.0 );
+         init   => 0.01 );  -- 1.0
 begin
    Text_IO.Put_Line(N'Img & " processors available");
-   GEM.Setenv("CLIMATE_INDEX", "qbo_30hPa.txt");
+   -- GEM.Setenv("CLIMATE_INDEX", "qbo_30hPa.txt");
    GEM.Setenv("IMPC", "3");  -- these are 6-months earlier than 9 & 10
    GEM.Setenv("IMPD", "4");
    GEM.LTE.Primitives.Shared.Load(D);

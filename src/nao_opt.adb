@@ -38,7 +38,7 @@ procedure NAO_Opt is
 
   begin
    Text_IO.Put_Line(N'Img & " processors available");
-   GEM.Setenv("CLIMATE_INDEX", "nao.txt");
+   -- GEM.Setenv("CLIMATE_INDEX", "nao.txt");
    GEM.Setenv("IMPA", "9");  -- these are 6-months earlier than 9 & 10
    GEM.Setenv("IMPB", "6");
    GEM.Setenv("IMPC", "3");  -- these are 6-months earlier than 9 & 10
