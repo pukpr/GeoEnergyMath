@@ -33,7 +33,9 @@ procedure NAO_Opt is
          fA     => 0.600532903, -- 7.55161
          k0     => 0.169,
          level  => 0.0,
-         init   => 0.0063);
+         init   => 0.0063,
+         order2 => 0.0000,
+         order3 => 0.0000);
 
 
   begin
@@ -49,9 +51,13 @@ procedure NAO_Opt is
    for I in 1..Integer'Last loop
       -- delay 1.0;
       -- The call to Status is blocking
-      if I mod 100 =0 then
-         Text_IO.Put_Line(GEM.LTE.Primitives.Solution.Status & " #" & I'Img);
-      end if;
+      declare
+         S : String := GEM.LTE.Primitives.Solution.Status;
+      begin
+         if I mod 100 = 0 then
+            Text_IO.Put_Line(S & " #" & I'Img);
+         end if;
+      end;
       exit when GEM.LTE.Primitives.Halted;
    end loop;
    Text_IO.Put_Line("Main exiting, flushing other tasks");

@@ -30,7 +30,7 @@ package body GEM.LTE.Primitives.Solution is
       end loop;
    end Start;
 
-   Worst_Case : constant := 0.001;
+   Worst_Case : constant LONG_FLOAT := GEM.Getenv("STARTING_METRIC", 0.001);
 
    --
    -- This is the passive monitoring object with mutual exclusve access
@@ -193,7 +193,7 @@ package body GEM.LTE.Primitives.Solution is
          if RMS_Metric then
             return RMS(X,Y)*CC(X,Y);
          else
-            return CC(X,Y);
+            return CC(X,Y); -- TEMP
          end if;
       end Metric;
 
@@ -261,9 +261,11 @@ package body GEM.LTE.Primitives.Solution is
       CorrCoeffTest, Old_CCTest : Long_Float := 0.0;
       Progress_Cycle, Spread : Long_Float;
       Counter : Long_Integer := 0;
-      First : Integer := GEM.Getenv("TRAIN_START", Data_Records'First+12);
-      Last : Integer := GEM.Getenv("TRAIN_END", Data_Records'Last-12);
+      First : Integer := Data_Records'First+12;
+      Last : Integer := Data_Records'Last-12;
       Mid : Integer := (First+Last)/2;
+      TS : Long_Float := GEM.Getenv("TRAIN_START", Data_Records(First).Date);
+      TE : Long_Float := GEM.Getenv("TRAIN_END", Data_Records(Last).Date);
 
       ------------------------------------------------------------------------
       -- This is close to a violtion of encapsulation, as we need a way
@@ -280,6 +282,14 @@ package body GEM.LTE.Primitives.Solution is
       ------------------------------------------------------------------------
 
    begin
+      for I in Data_Records'Range loop
+         exit when Data_Records(I).Date > TS; -- Finding indices to start
+         First := I;
+      end loop;
+      for I in Data_Records'Range loop
+         exit when Data_Records(I).Date > TE; -- and end
+         Last := I;
+      end loop;
       Start_Time := Long_Float(Integer(Start_Time)); -- 1880.0;
       Old_CC := 0.0;
       Walker.Reset;
@@ -298,17 +308,20 @@ package body GEM.LTE.Primitives.Solution is
          if Split_Training and Best then
             Save(Model, Data_Records);
             delay 1.0; -- don't do anything if in the lead, let others catch up.
-         else
+         else -- if Scaling > 0.0 then
             Model := LTE(Forcing => IIR(
                          Raw  => Impulse_Amplify(
                            Raw    => FIR(
                              Raw     => Tide_Sum(Template     => Data_Records,
                                                  Constituents => D.LP,
                                                  Ref_Time     => Start_Time + D.ShiftT,
-                                                 Scaling      => Scaling),
-                             Behind  => D.fB,  -- -0.022004419,
-                             Current => D.fC,  -- 1.469665629,
-                             Ahead   => D.fA), -- 0.600532903,
+                                                 Scaling      => Scaling,
+                                                 Order2       => D.Order2,
+                                                 Order3       => D.Order3
+                                                ),
+                             Behind  => D.fB,
+                             Current => D.fC,
+                             Ahead   => D.fA),
                            Offset => D.Offset),
                          lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
                          iA => D.init, iB => 0.0, iC => 0.0, iD => 0.0),
@@ -316,6 +329,24 @@ package body GEM.LTE.Primitives.Solution is
 
             -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
             Model := FIR(FIR(Model,0.333,0.333,0.333), 0.333, 0.333, 0.333);
+         --  else
+         --     Model := LTE(Forcing => IIR(
+         --                  Raw  => Impulse_Amplify(
+         --                    Raw    => FIR(
+         --                      Raw     => GravityM(Template     => Data_Records,
+         --                                          Constituents => D.LP,
+         --                                          Ref_Time     => Start_Time + D.ShiftT,
+         --                                          Scaling      => D.Level),
+         --                      Behind  => D.fB,
+         --                      Current => D.fC,
+         --                      Ahead   => D.fA),
+         --                    Offset => D.Offset),
+         --                  lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
+         --                  iA => D.init, iB => 0.0, iC => 0.0, iD => 0.0),
+         --                  Wave_Numbers => D.LT, Offset => Scaling, K0 => D.K0);
+         --
+         --     -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
+         --     Model := FIR(FIR(Model,0.333,0.333,0.333), 0.333, 0.333, 0.333);
          end if;
 
          -- pragma Debug ( Dump(Model, Data_Records, Run_Time) );
@@ -385,7 +416,7 @@ package body GEM.LTE.Primitives.Solution is
 
    exception
       when E : others =>
-         Text_IO.Put_Line ("Error: " & Ada.Exceptions.Exception_Information(E));
+         Text_IO.Put_Line ("Solution err: " & Ada.Exceptions.Exception_Information(E));
          -- The following may need a debug-specifi compiler switch to activate
          Text_IO.Put_Line (Gnat.Traceback.Symbolic.Symbolic_Traceback(E));
 

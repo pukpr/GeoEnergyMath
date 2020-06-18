@@ -1,16 +1,16 @@
-
 with System.Task_Info;
 with GEM.LTE.Primitives.Solution;
 with GEM.LTE.Primitives.Shared;
+with GEM.LTE.Lib;
 with Text_IO;
 procedure QBO_Opt is
    N :  Positive := System.Task_Info.Number_Of_Processors;
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
-        (NLP    => GEM.LTE.LPQ'Length,
-         NLT    => GEM.LTE.LTQ'Length,
-         LP     => GEM.LTE.LPQ,
-         LT     => GEM.LTE.LTQ,
+        (NLP    => GEM.LTE.Lib.LPQ'Length,
+         NLT    => GEM.LTE.Lib.LTQ'Length,
+         LP     => GEM.LTE.Lib.LPQ,
+         LT     => GEM.LTE.Lib.LTQ,
          Offset => -0.002770852,
          bg     => 0.037589404,
          ImpA   => 13.57577452,  -- This is the positive impulse per year
@@ -26,7 +26,9 @@ procedure QBO_Opt is
          fA     => 0.600532903,
          k0     => 2.169,
          level  => 0.5,
-         init   => 0.01 );  -- 1.0
+         init   => 0.01,
+         order2 => 0.000,
+         order3 => 0.000 );  -- 1.0
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    -- GEM.Setenv("CLIMATE_INDEX", "qbo_30hPa.txt");
