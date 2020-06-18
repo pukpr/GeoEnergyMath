@@ -39,6 +39,12 @@ package GEM.LTE.Primitives is
    function Tide_Sum (Template : in Data_Pairs;
                       Constituents : in Long_Periods;
                       Ref_Time : in Long_Float; -- remove the millenial offset
+                      Scaling : in Long_Float;
+                      Order2, Order3 : in Long_Float) return Data_Pairs;
+
+   function GravityM (Template : in Data_Pairs;
+                      Constituents : in Long_Periods;
+                      Ref_Time : in Long_Float; -- remove the millenial offset
                       Scaling : in Long_Float) return Data_Pairs;
 
    function LTE (Forcing : in Data_Pairs;

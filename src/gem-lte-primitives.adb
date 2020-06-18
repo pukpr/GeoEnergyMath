@@ -1,6 +1,7 @@
 with Text_IO;
 with Ada.Long_Float_Text_IO;
 with Ada.Numerics.Long_Elementary_Functions;
+with Ada.Exceptions;
 
 package body GEM.LTE.Primitives is
 
@@ -19,6 +20,9 @@ package body GEM.LTE.Primitives is
       when Text_IO.End_Error =>
          Text_IO.Close(File => Data);
          return Count;
+      when E : Others =>
+         Text_IO.Put_Line(Ada.Exceptions.Exception_Information(E));
+         return 0;
    end File_Lines;
 
    function Make_Data (Name : String) return Data_Pairs is
@@ -39,6 +43,10 @@ package body GEM.LTE.Primitives is
       end loop;
       Text_IO.Close(File => Data);
       return Arr;
+   exception
+      when E : Others =>
+         Text_IO.Put_Line(Ada.Exceptions.Exception_Information(E));
+         return Arr;
    end Make_Data;
 
    -- a running mean filter, used to damp the inpulse response
@@ -92,7 +100,8 @@ package body GEM.LTE.Primitives is
    function Tide_Sum (Template : in Data_Pairs;
                       Constituents : in Long_Periods;
                       Ref_Time : in Long_Float;
-                      Scaling : in Long_Float) return Data_Pairs is
+                      Scaling : in Long_Float;
+                      Order2, Order3 : in Long_Float) return Data_Pairs is
       Pi : Long_Float := Ada.Numerics.Pi;
       Time : Long_Float;
       Res : Data_Pairs := Template;
@@ -110,12 +119,48 @@ package body GEM.LTE.Primitives is
                   TF := TF + L.Amplitude*Cos(2.0*Pi*Year/L.Period*Time + L.Phase);
                end;
             end loop;
-            Res(I) := (Time, Scaling * TF);
-            -- Text_IO.Put_Line(Res(I).Date'Img & " " & Res(I).Value'Img);
+            Res(I) := (Time, Scaling * (TF + Order2*TF*TF + Order3*TF*TF*TF) );
          end;
       end loop;
       return Res;
    end Tide_Sum;
+
+   -- Graviational model assuming 1/R^3
+   function GravityM (Template : in Data_Pairs;
+                      Constituents : in Long_Periods;
+                      Ref_Time : in Long_Float;
+                      Scaling : in Long_Float) return Data_Pairs is
+      Pi : Long_Float := Ada.Numerics.Pi;
+      Time : Long_Float;
+      Res : Data_Pairs := Template;
+      Last_TF : Long_Float := 0.0;
+   begin
+      for I in Template'Range loop
+         Time := Template(I).Date - Ref_Time;
+         declare
+            TF : Long_Float := 0.0;
+            use Ada.Numerics.Long_Elementary_Functions;
+         begin
+            for J in Constituents'Range loop
+               declare
+                  L : Long_Period renames Constituents(J);
+               begin
+                  TF := TF + L.Amplitude*Cos(2.0*Pi*Year/L.Period*Time + L.Phase);
+               end;
+            end loop;
+            TF := 1.0/(1.0+Scaling*TF)**2;
+            if I = Template'First then
+               Res(I) := (Time, 0.0);
+            else
+               TF := TF - Last_TF; -- Differential to remove any bias
+               Res(I) := (Time, TF);
+            end if;
+            Last_TF := TF;
+            -- Text_IO.Put_Line(Res(I).Date'Img & " " & Res(I).Value'Img);
+         end;
+      end loop;
+      return Res;
+   end GravityM;
 
    -- Stands for Laplace's Tidal Equation solution
    -- see Mathematical Geoenergy (2018), Ch.12
@@ -134,6 +179,9 @@ package body GEM.LTE.Primitives is
                   M : Modulation renames Wave_Numbers(J);
                begin
                   LF := LF + M.Amplitude*Sin(M.Wavenumber*Res(I).Value + M.Phase);
+               exception
+                  when Constraint_Error =>
+                     null;
                end;
             end loop;
             LF := LF + Offset + K0*Res(I).Value; -- K0 is wavenumber=0 solution
@@ -197,6 +245,9 @@ package body GEM.LTE.Primitives is
       else
          return (Long_Float(n) * sum_XY - sum_X * sum_Y) / Sqrt(Denominator);
       end if;
+   exception
+      when Constraint_Error =>
+         return 0.0;
    end CC;
 
    -- A zero-crossing metric that is faster than CC which can be used to

@@ -25,6 +25,8 @@ package GEM.LTE.Primitives.Shared is
          k0     : Long_Float;
          level  : Long_Float;
          init   : Long_Float;
+         order2 : Long_Float;
+         order3 : Long_Float;
 
          LP     : Long_Periods(1..NLP);
          LT     : Modulations(1..NLT);

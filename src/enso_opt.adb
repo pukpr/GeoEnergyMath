@@ -26,7 +26,9 @@ procedure ENSO_Opt is
          fA     => 0.600532903, -- 7.55161
          k0     => 0.169,
          level  => 0.0,
-         init   => 0.0063);
+         init   => 0.0063,
+         order2 => 0.000001,
+         order3 => 0.000001);
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.LTE.Primitives.Shared.Load(D); -- if available

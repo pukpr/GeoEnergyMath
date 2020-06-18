@@ -7,10 +7,10 @@ procedure Tidal_Opt is
    N :  Positive := System.Task_Info.Number_Of_Processors;
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
-        (NLP    => GEM.LTE.SP'Length,
-         NLT    => GEM.LTE.LT0'Length,
-         LP     => GEM.LTE.SP,
-         LT     => GEM.LTE.LT0,
+        (NLP    => GEM.LTE.SP'Length, -- SP
+         NLT    => GEM.LTE.LT0'Length, -- LT0
+         LP     => GEM.LTE.SP, -- SP
+         LT     => GEM.LTE.LT0, --LT0
          Offset => 0.001,
          bg     => 0.9,
          ImpA   => 0.0, -- 0.0,
@@ -26,7 +26,9 @@ procedure Tidal_Opt is
          fA     => 0.0, -- 7.55161
          k0     => 0.9,
          level  => 0.0,
-         init   => 0.01);
+         init   => 0.01,
+         order2 => 0.0,  -- 0
+         order3 => 0.0); -- 0
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.LTE.Primitives.Shared.Load(D); -- if available
