@@ -206,6 +206,9 @@ package body GEM.LTE.Primitives is
             return True;
          end if;
       end loop;
+      if Value = ThirdAnnual then
+         return True;
+      end if;
       return False;
    end Is_Fixed;
 
@@ -269,7 +272,8 @@ package body GEM.LTE.Primitives is
       return sum_XY / sum_absXY;
    end Xing;
 
-  function RMS (X, Y : in Data_Pairs) return Long_Float is
+  function RMS (X, Y : in Data_Pairs;
+                Ref, Offset : in Long_Float) return Long_Float is
       N : Integer := X'Length;
       sum_XY : Long_Float := 0.0;
       use Ada.Numerics.Long_Elementary_Functions;
@@ -277,10 +281,10 @@ package body GEM.LTE.Primitives is
    begin
       for I in X'Range loop
         -- sum of (X[i] - Y[i])^2
-        sum_XY := sum_XY + (X(i).Value - Y(j).Value)**2;
+        sum_XY := sum_XY + (X(i).Value - Y(j).Value + Offset)**2;
         J := J + 1;
       end loop;
-      return 1000.0/sqrt(sum_XY);
+      return 1.0 - sqrt(sum_XY)/Ref;
    end RMS;
 
    procedure Dump (Model, Data : in Data_Pairs;
@@ -310,28 +314,28 @@ package body GEM.LTE.Primitives is
    --
 
    protected Safe is
-      procedure Save (Model, Data : in Data_Pairs;
+      procedure Save (Model, Data, Forcing : in Data_Pairs;
                       File_Name : in String);
    end Safe;
 
    protected body Safe is
-      procedure Save (Model, Data : in Data_Pairs;
+      procedure Save (Model, Data, Forcing : in Data_Pairs;
                       File_Name : in String) is
          FT : Text_IO.File_Type;
       begin
          Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
          for I in Data'Range loop
             Text_IO.Put_Line(FT, Data(I).Date'Img & ", " & Model(I).Value'Img &
-                               ", " & Data(I).Value'Img);
+                               ", " & Data(I).Value'Img & ", " & Forcing(I).Value'Img);
          end loop;
          Text_IO.Close(FT);
       end Save;
    end Safe;
 
-   procedure Save (Model, Data : in Data_Pairs;
+   procedure Save (Model, Data, Forcing : in Data_Pairs;
                    File_Name : in String := "lte_results.csv") is
    begin
-      Safe.Save(Model,Data, File_Name);
+      Safe.Save(Model,Data, Forcing, File_Name);
    end Save;
 
 end GEM.LTE.Primitives;

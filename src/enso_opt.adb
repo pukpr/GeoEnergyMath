@@ -1,10 +1,13 @@
-
+with Ada.Command_Line;
 with System.Task_Info;
 with GEM.LTE.Primitives.Solution;
 with GEM.LTE.Primitives.Shared;
 with Text_IO;
+
 procedure ENSO_Opt is
    N :  Positive := System.Task_Info.Number_Of_Processors;
+   Ch : Character;
+   Avail : Boolean;
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
         (NLP    => GEM.LTE.LP'Length,
@@ -13,25 +16,29 @@ procedure ENSO_Opt is
          LT     => GEM.LTE.LTM,
          Offset => -0.002770852,
          bg     => 0.037589404,
-         ImpA   => 13.57577452, -- 0.0,
-         ImpB   => 7.056004563, -- 1.22,
-         ImpC   => 20.25515663, -- 1.399,
-         ImpD   => 1.659027049, -- 1.2149,
+         ImpA   => 13.57577452,
+         ImpB   => 7.056004563,
+         ImpC   => 20.25515663,
+         ImpD   => 1.659027049,
          mA     => 0.080599014,
          mP     => -0.008405309,
          mD     => -0.0021993,
          shiftT => 0.000001,
-         fB     => -0.022004419, -- 10.761,
-         fC     => 1.469665629, -- 11.865,
-         fA     => 0.600532903, -- 7.55161
+         fB     => -0.022004419,
+         fC     => 1.469665629,
+         fA     => 0.600532903,
          k0     => 0.169,
          level  => 0.0,
          init   => 0.0063,
          order2 => 0.000001,
          order3 => 0.000001);
+
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.LTE.Primitives.Shared.Load(D); -- if available
+   D.LT(D.LT'Last).Amplitude := 0.000000;
+   D.LT(D.LT'Last-1).Amplitude := 0.000000;
+
    GEM.LTE.Primitives.Shared.Put(D);
    GEM.LTE.Primitives.Solution.Start(D.NLP,D.NLT,N);
    for I in 1..Integer'Last loop
@@ -44,6 +51,12 @@ begin
             Text_IO.Put_Line(S & " #" & I'Img);
          end if;
       end;
+      Text_IO.Get_Immediate(Ch, Avail);
+      if Avail then
+         if Ch = 'q' then
+            GEM.LTE.Primitives.Stop;
+         end if;
+      end if;
       exit when GEM.LTE.Primitives.Halted;
    end loop;
    Text_IO.Put_Line("Main exiting, flushing other tasks");
