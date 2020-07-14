@@ -154,7 +154,6 @@ package body GEM.LTE.Primitives.Solution is
                            Split_Training : in BOOLEAN := FALSE) is
       package LEF renames Ada.Numerics.Long_Elementary_Functions;
 
-      Data : Text_IO.File_Type;
       Data_Records : Data_Pairs := Make_Data(File_Name);
 
       function Impulse (Time : Long_Float) return Long_Float;
@@ -162,13 +161,17 @@ package body GEM.LTE.Primitives.Solution is
 
       function Impulse_Amplify is new Amplify(Impulse => Impulse_Sin);
 
-      Start_Time : Long_Float := Data_Records(Data_Records'First).Date;
-      Model      : Data_Pairs := Data_Records;
+      Ref_Time : Long_Float := GEM.Getenv("REF_TIME", Data_Records(Data_Records'First).Date);
+      Forcing  : Data_Pairs := Data_Records;
+      Model    : Data_Pairs := Data_Records;
+      KeepModel: Data_Pairs := Data_Records;
+
       Best  : Boolean := False;
       Percentage : Integer;
       Best_Client : Integer;
 
       D : Shared.Param_S(N_Tides, N_Modulations) := GEM.LTE.Primitives.Shared.Get(N_Tides, N_Modulations);
+      DKeep : Shared.Param_S(N_Tides, N_Modulations) := D;
       D0 : constant Shared.Param_S := D;  -- reference
 
       ImpA : constant Integer := GEM.Getenv("IMPA", 9); -- Defaults for ENSO
@@ -183,17 +186,18 @@ package body GEM.LTE.Primitives.Solution is
       Spread_Max : constant Long_Float := GEM.Getenv("SPREAD_MAX", 0.1);
       Spread_Cycle : constant Long_Float := GEM.Getenv("SPREAD_CYCLE", 1000.0);
       Catchup : constant Boolean := GEM.Getenv("THRESHOLD_ACTION", "RESTART") = "CATCHUP";
-      --K0 : constant Long_Float := GEM.Getenv("K0", 0.169);
       RMS_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "RMS";
       Sin_Impulse : constant Boolean := GEM.Getenv("IMPULSE", "DELTA") = "SIN";
       Sampling_Per_Year : constant Long_Float := GEM.Getenv("SAMPLING", 12.0);
+      Filter : constant Long_Float := GEM.Getenv("FILTER", 0.33333333);
+      RMS_Data : Long_Float := 0.0;
 
       function Metric (X, Y : in Data_Pairs) return Long_Float is
       begin
          if RMS_Metric then
-            return RMS(X,Y)*CC(X,Y);
+            return (RMS(X,Y,RMS_Data, 0.0) + CC(X,Y))/2.0;
          else
-            return CC(X,Y); -- TEMP
+            return CC(X,Y);
          end if;
       end Metric;
 
@@ -216,6 +220,18 @@ package body GEM.LTE.Primitives.Solution is
          return Value + D.bg;
       end Impulse;
 
+      function Impulse_Power (Time : Long_Float) return Long_Float is
+         Pi : Long_Float := Ada.Numerics.Pi;
+         Value : Long_Float;
+         use Ada.Numerics.Long_Elementary_Functions;
+      begin
+         -- Optimize the impulse power, this will create an even and odd impulse
+         Value := D.ImpA*(abs(COS(2.0*Pi*(Time+D.ImpB))))**D.ImpD
+                 +D.ImpC*(abs(COS(2.0*Pi*(Time+D.ImpB))))**D.ImpD * COS(2.0*Pi*(Time+D.ImpB));
+         return Value + D.bg;
+      end Impulse_Power;
+
+
       function Impulse_Sin (Time : Long_Float) return Long_Float is
          Pi : Long_Float := Ada.Numerics.Pi;
          Value : Long_Float;
@@ -225,8 +241,12 @@ package body GEM.LTE.Primitives.Solution is
          if not Sin_Impulse then
             return Impulse(Time);
          end if;
-         -- uisng the impA & impB env vars as odd & even powers, since they won't be used for impulse
-         Value := D.ImpA*(COS(2.0*Pi*(Time+D.ImpB)))**ImpA+D.ImpC*(COS(2.0*Pi*(Time+D.ImpB)))**ImpB;
+         if ImpA > 0 then
+            -- using the impA & impB env vars as odd & even powers, since they won't be used for impulse
+            Value := D.ImpA*(COS(2.0*Pi*(Time+D.ImpB)))**ImpA+D.ImpC*(COS(2.0*Pi*(Time+D.ImpB)))**ImpB + D.ImpD*COS(2.0*Pi*(Time+D.ImpB));
+         else
+            return Impulse_Power(Time);
+         end if;
          return Value + D.bg;
       end Impulse_Sin;
 
@@ -239,22 +259,6 @@ package body GEM.LTE.Primitives.Solution is
          Ada.Long_Float_Text_IO.Put(Val2, Fore=>4, Aft=>10, Exp=>0);
          Text_IO.Put_Line("  " & Thread'Img & Counter'Img);
       end Put_CC;
-
-      procedure Zero (Model : in out Long_Periods;
-                      Amplitude : in Long_Float ) is
-      begin
-         for I in Model'Range loop
-             Model(i).Amplitude := Amplitude;
-         end loop;
-      end Zero;
-
-      procedure Zero (Model : in out Modulations;
-                      Amplitude : in Long_Float ) is
-      begin
-         for I in Model'Range loop
-             Model(i).Amplitude := Amplitude;
-         end loop;
-      end Zero;
 
       der : Long_Float := 1.0 + D.mD - D.mA - D.mP; -- keeps the inegrator stable
       CorrCoeff, Old_CC : Long_Float := 0.0;
@@ -290,31 +294,30 @@ package body GEM.LTE.Primitives.Solution is
          exit when Data_Records(I).Date > TE; -- and end
          Last := I;
       end loop;
-      Start_Time := Long_Float(Integer(Start_Time)); -- 1880.0;
+      for I in First .. Last loop
+         RMS_Data := RMS_Data + Data_Records(I).Value * Data_Records(I).Value;
+      end loop;
+      RMS_Data := Ada.Numerics.Long_Elementary_Functions.Sqrt(RMS_Data);
       Old_CC := 0.0;
       Walker.Reset;
       Text_IO.Put_Line("Catchup mode enabled:" & Boolean'Image(Catchup) );
+      Keep := Set;
 
       loop
          Counter := Counter + 1;
          delay 0.0; -- context switching point if multi-processing not avilable
-         Progress_Cycle := Long_Float(Counter);
-         -- This slowly oscillates to change the size of the step to hopefully
-         -- help it escape local minima, every N cycles
-         Spread := Spread_Min + Spread_Max*(1.0-LEF.Cos(Progress_Cycle/Spread_Cycle));
-         Walker.Markov(Set, Keep, Spread);
 
          -- Tidal constituents summed, amplified by impulse, and LTE modulated
          if Split_Training and Best then
-            Save(Model, Data_Records);
+            Save(Model, Data_Records, Forcing);
             delay 1.0; -- don't do anything if in the lead, let others catch up.
-         else -- if Scaling > 0.0 then
-            Model := LTE(Forcing => IIR(
+         else
+            Forcing := IIR(
                          Raw  => Impulse_Amplify(
                            Raw    => FIR(
                              Raw     => Tide_Sum(Template     => Data_Records,
                                                  Constituents => D.LP,
-                                                 Ref_Time     => Start_Time + D.ShiftT,
+                                                 Ref_Time     => Ref_Time + D.ShiftT,
                                                  Scaling      => Scaling,
                                                  Order2       => D.Order2,
                                                  Order3       => D.Order3
@@ -324,29 +327,15 @@ package body GEM.LTE.Primitives.Solution is
                              Ahead   => D.fA),
                            Offset => D.Offset),
                          lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
-                         iA => D.init, iB => 0.0, iC => 0.0, iD => 0.0),
-                         Wave_Numbers => D.LT, Offset => D.level, K0 => D.K0);
+                         iA => D.init, iB => 0.0, iC => 0.0, iD => 0.0);
+
+            Model := LTE(Forcing => Forcing,
+                         Wave_Numbers => D.Lt, Offset => D.level, K0 => D.K0);  -- D.LT GEM.LTE.LT0
+
 
             -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
-            Model := FIR(FIR(Model,0.333,0.333,0.333), 0.333, 0.333, 0.333);
-         --  else
-         --     Model := LTE(Forcing => IIR(
-         --                  Raw  => Impulse_Amplify(
-         --                    Raw    => FIR(
-         --                      Raw     => GravityM(Template     => Data_Records,
-         --                                          Constituents => D.LP,
-         --                                          Ref_Time     => Start_Time + D.ShiftT,
-         --                                          Scaling      => D.Level),
-         --                      Behind  => D.fB,
-         --                      Current => D.fC,
-         --                      Ahead   => D.fA),
-         --                    Offset => D.Offset),
-         --                  lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
-         --                  iA => D.init, iB => 0.0, iC => 0.0, iD => 0.0),
-         --                  Wave_Numbers => D.LT, Offset => Scaling, K0 => D.K0);
-         --
-         --     -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
-         --     Model := FIR(FIR(Model,0.333,0.333,0.333), 0.333, 0.333, 0.333);
+            Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
+
          end if;
 
          -- pragma Debug ( Dump(Model, Data_Records, Run_Time) );
@@ -376,6 +365,8 @@ package body GEM.LTE.Primitives.Solution is
             Old_CC := CorrCoeff;
             Old_CCTest := CorrCoeffTest;
             Keep := Set;
+            KeepModel := Model;
+            DKeep := D;
             if CatchUp then  -- save it for other threads to reset from
                GEM.LTE.Primitives.Shared.Put(D);
             end if;
@@ -396,14 +387,18 @@ package body GEM.LTE.Primitives.Solution is
 
          exit when Halted;
 
+         Progress_Cycle := Long_Float(Counter);
+         -- This slowly oscillates to change the size of the step to hopefully
+         -- help it escape local minima, every N cycles
+         Spread := Spread_Min + Spread_Max*(1.0-LEF.Cos(Progress_Cycle/Spread_Cycle));
+         Walker.Markov(Set, Keep, Spread);
+
       end loop;
       Monitor.Stop;
       if Best_Client = ID then
-         Set := Keep;
-         D := D;
-         GEM.LTE.Primitives.Shared.Save(D);
+         GEM.LTE.Primitives.Shared.Save(DKeep);
          Walker.Dump(Keep); -- Print results of last best evaluation,
-         Save(Model, Data_Records);    -- Should also save to file
+         Save(KeepModel, Data_Records, Forcing);    -- Should also save to file
          if Split_Training then
             Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);
          else

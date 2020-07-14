@@ -12,7 +12,7 @@ package GEM.LTE.Primitives is
    function Make_Data (Name : in String) return Data_Pairs;
 
    -- Save results
-   procedure Save (Model, Data : in Data_Pairs;
+   procedure Save (Model, Data, Forcing : in Data_Pairs;
                    File_Name : in String := "lte_results.csv");
 
    --
@@ -66,7 +66,8 @@ package GEM.LTE.Primitives is
    function Xing (X, Y : in Data_Pairs) return Long_Float;
 
    -- RMS
-   function RMS (X, Y : in Data_Pairs) return Long_Float;
+   function RMS (X, Y : in Data_Pairs;
+                 Ref, Offset : in Long_Float) return Long_Float;
 
    -- Dumps to stdIO all the data up to time corresponding to run_time
    procedure Dump (Model, Data : in Data_Pairs;
