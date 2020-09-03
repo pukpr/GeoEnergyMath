@@ -52,17 +52,38 @@ package body GEM.LTE.Primitives is
    -- a running mean filter, used to damp the inpulse response
    function IIR (Raw : in Data_Pairs;
                  lagA, lagB, lagC, lagD : in Long_Float;
-                 iA, iB, iC, iD : in Long_Float := 0.0) return  Data_Pairs is
+                 iA, iB, iC, iD : in Long_Float := 0.0;
+                 Start : in Long_Float := Long_Float'First) return  Data_Pairs is
       Res : Data_Pairs := Raw;
+      Start_Index : Integer;
    begin
+      for I in Raw'Range loop
+         Start_Index := I;
+         exit when Raw(I).Date > Start;
+      end loop;
+      --Text_IO.Put_Line(Raw(Start_Index).Date'Img & " " & Start_Index'Img);
+
       -- The first few values are sensitive to prior information so can adjust
       -- these for better fits in the early part of the time series.
       -- The long range skip value = iD goes back 12 months
-      Res(Raw'First + 1).Value := iD; -- -0.000257937;
-      Res(Raw'First + 9).Value := iC; -- 0.006775218;
-      Res(Raw'First + 10).Value := iB; --0.020083924;
-      Res(Raw'First + 11).Value := iA; ---0.006329159;
-      for I in Raw'First + 12 .. Raw'Last loop
+      Res(Start_Index + 1).Value := iD; -- -0.000257937;
+      Res(Start_Index + 9).Value := iC; -- 0.006775218;
+      Res(Start_Index + 10).Value := iB; --0.020083924;
+      Res(Start_Index + 11).Value := iA; ---0.006329159;
+      for I in Start_Index + 12 .. Raw'Last loop
+         Res(I).Value := Raw(I-2).Value  -- this should be I-1 for prior step (will fix)
+           + lagA*Res(I-1).Value
+           + lagB*Res(I-2).Value
+           + lagC*Res(I-3).Value
+           + lagD*Res(I-11).Value;
+      end loop;
+      -- Backwards integration
+      --  for I in reverse Raw'First .. Start_Index-1 loop
+      --     Res(I).Value := (Res(I+3).Value - Raw(I+1).Value
+      --       - lagA*Res(I+2).Value
+      --       - lagB*Res(I+1).Value)/lagC;
+      --  end loop;
+      for I in Raw'First+12 .. Start_Index-1 loop
          Res(I).Value := Raw(I-2).Value  -- this should be I-1 for prior step (will fix)
            + lagA*Res(I-1).Value
            + lagB*Res(I-2).Value
@@ -124,6 +145,52 @@ package body GEM.LTE.Primitives is
       end loop;
       return Res;
    end Tide_Sum;
+
+   -- Conventional tidal series summation or superposition of cycles
+   function Tide_Series (Template : in Data_Pairs;
+                      Constituents : in Long_Periods;
+                      Ref_Time : in Long_Float;
+                      Scaling : in Long_Float;
+                      Order2, Order3 : in Long_Float;
+                      Coefficients : in Harmonics) return Data_Pairs is
+      Pi : Long_Float := Ada.Numerics.Pi;
+      Time : Long_Float;
+      Res : Data_Pairs := Template;
+      Tf : Long_Float;
+
+      function Fundamental (Index : in Integer) return Long_Float is
+         L : Long_Period renames Constituents(Index);
+         use Ada.Numerics.Long_Elementary_Functions;
+      begin
+         if Index = 1 then
+            return 1.0;
+         else
+            return L.Amplitude*Cos(2.0*Pi*Year/L.Period*Time + L.Phase);
+         end if;
+      end Fundamental;
+
+      Counter : Integer;
+
+   begin
+      for I in Template'Range loop
+         Tf := 0.0;
+         Counter := 1;
+         Time := Template(I).Date - Ref_Time;
+         for J in Constituents'Range loop
+            for K in Constituents'First .. J loop
+               for L in Constituents'First .. K loop
+                  for M in Constituents'First .. L loop
+                     Tf := Tf + Coefficients (Counter) * Fundamental(J) * Fundamental(K) * Fundamental(L) * Fundamental (M);
+                     Counter := Counter + 1;
+                  end loop;
+               end loop;
+            end loop;
+         end loop;
+         TF := TF + Order2*TF*TF + Order3*TF*TF*TF;
+         Res(I) := (Time, Scaling*TF);
+      end loop;
+      return Res;
+   end Tide_Series;
 
    -- Graviational model assuming 1/R^3
    function GravityM (Template : in Data_Pairs;

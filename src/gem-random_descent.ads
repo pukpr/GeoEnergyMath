@@ -16,6 +16,10 @@ package GEM.Random_Descent is
                      Ref : out LF_Array;     -- returns the unchanged set
                      Spread : in Long_Float);
 
+   procedure Markov (Value : in out Long_Float;  -- Randomly selects from param set
+                     Ref : out Long_Float;     -- returns the unchanged set
+                     Spread : in Long_Float);
+
    procedure Dump(Set : in LF_Array);
 
    -- Random number generator reset, otherwise it will start from fixed seed

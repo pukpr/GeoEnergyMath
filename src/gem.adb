@@ -35,6 +35,11 @@ package body GEM is
       return Long_Float'Value (Getenv (Name, Long_Float'Image (Default)));
    end Getenv;
 
+   function Getenv (Name : in String; Default : in Boolean) return Boolean is
+   begin
+      return Boolean'Value (Getenv (Name, Boolean'Image (Default)));
+   end Getenv;
+
    procedure Setenv (Name : in String; Value : in String) is
    begin
       Ada.Environment_Variables.Set(Name, Value);

@@ -11,6 +11,7 @@ package body GEM.Random_Descent is
 
    subtype Set_Index is Positive range 1..Set_Range;
    package DR is new Ada.Numerics.Discrete_Random(Set_Index);
+   Flip_Value : constant Long_Float := GEM.Getenv("FLIP", 0.0);
 
    D : DR.Generator; -- Discrete for selecting from a set of params
    G : FR.Generator; -- Floating point for values
@@ -30,8 +31,26 @@ package body GEM.Random_Descent is
       else
          Adjust := 1.0 + Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
          Set(I) := Set(I) * Adjust;
+         if Ran < Flip_Value then
+            Set(I) := -Set(I);
+         end if;
       end if;
       --end loop;
+   end Markov;
+
+   procedure Markov (Value : in out Long_Float;
+                     Ref : out Long_Float;
+                     Spread : in Long_Float) is
+      Ran : Long_Float := Long_Float(FR.Random(G));
+      Sign : Long_Float := Long_Float(FR.Random(G) - 0.5); -- Is step + or - ?
+      Adjust : Long_Float;
+   begin
+      Ref := Value;
+      Adjust := 1.0 + Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
+      Value := Value * Adjust;
+      if Ran < Flip_Value then
+         Value := -Value;
+      end if;
    end Markov;
 
    procedure Dump(Set : in LF_Array) is

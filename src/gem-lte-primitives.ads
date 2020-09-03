@@ -22,7 +22,8 @@ package GEM.LTE.Primitives is
    -- Infinite Impulse Response -- integrator
    function IIR (Raw : in Data_Pairs;
                  lagA, lagB, lagC, lagD : in Long_Float;
-                 iA, iB, iC, iD : in Long_Float := 0.0) return  Data_Pairs;
+                 iA, iB, iC, iD : in Long_Float := 0.0;
+                 Start : in Long_Float := Long_Float'First) return  Data_Pairs;
 
    -- Finite Impulse Response -- smoother
    function FIR (Raw : in Data_Pairs;
@@ -41,6 +42,13 @@ package GEM.LTE.Primitives is
                       Ref_Time : in Long_Float; -- remove the millenial offset
                       Scaling : in Long_Float;
                       Order2, Order3 : in Long_Float) return Data_Pairs;
+
+   function Tide_Series (Template : in Data_Pairs;
+                         Constituents : in Long_Periods;
+                         Ref_Time : in Long_Float; -- remove the millenial offset
+                         Scaling : in Long_Float;
+                         Order2, Order3 : in Long_Float;
+                         Coefficients : in Harmonics) return Data_Pairs;
 
    function GravityM (Template : in Data_Pairs;
                       Constituents : in Long_Periods;

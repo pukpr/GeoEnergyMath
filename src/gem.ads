@@ -8,6 +8,7 @@ package GEM is
    function Getenv (Name : in String; Default : in Long_Integer) return Long_Integer;
    function Getenv (Name : in String; Default : in Float) return Float;
    function Getenv (Name : in String; Default : in Long_Float) return Long_Float;
+   function Getenv (Name : in String; Default : in Boolean) return Boolean;
 
    procedure Setenv (Name : in String; Value : in String);
    procedure Clear (Name : in String);
