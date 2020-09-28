@@ -9,3 +9,5 @@ Requires an Ada compiler such as the GNAT IDE -- download community edition from
 Load the project file (such as LTE.gpr) into GNATStudio and select build from the menu. The compiled executable is located in an obj subdirectory.  The obj subdirectory may need to be created before compiling, run the executable from the root directory, i.e. 
 
 > obj/enso_opt
+
+See the local Wiki (https://github.com/pukpr/GeoEnergyMath/wiki/Laplace's-Tidal-Equation-modeling) for examples of drivers and typical results of modeling the various data sets.
