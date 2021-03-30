@@ -85,4 +85,11 @@ package GEM.LTE.Primitives is
    procedure Stop;
    function Halted return Boolean;
 
+   -- 3 point median
+   function Median (Raw : in Data_Pairs) return Data_Pairs;
+
+   -- rectangular window of width = 2*Lobe_Width+1
+   function Window (Raw : in Data_Pairs;
+                    Lobe_Width : in Positive) return Data_Pairs;
+
 end GEM.LTE.Primitives;

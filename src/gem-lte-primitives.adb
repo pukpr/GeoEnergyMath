@@ -4,6 +4,7 @@ with Ada.Numerics.Long_Elementary_Functions;
 with Ada.Exceptions;
 
 package body GEM.LTE.Primitives is
+   Aliased_Period : constant Boolean := GEM.Getenv("ALIAS", FALSE);
 
    function File_Lines (Name : String) return Integer is
       Data  : Text_IO.File_Type;
@@ -136,8 +137,18 @@ package body GEM.LTE.Primitives is
             for J in Constituents'Range loop
                declare
                   L : Long_Period renames Constituents(J);
+                  Period : Long_Float;
                begin
-                  TF := TF + L.Amplitude*Cos(2.0*Pi*Year/L.Period*Time + L.Phase);
+                  if Aliased_Period then
+                     if L.Period >= Year/3.01 then
+                        Period := L.Period;
+                     else
+                        Period := 1.0/(Year/L.Period - Long_Float(INTEGER(Year/L.Period)));
+                     end if;
+                  else
+                     Period := L.Period;
+                  end if;
+                  TF := TF + L.Amplitude*Cos(2.0*Pi*Year/Period*Time + L.Phase);
                end;
             end loop;
             Res(I) := (Time, Scaling * (TF + Order2*TF*TF + Order3*TF*TF*TF) );
@@ -404,5 +415,45 @@ package body GEM.LTE.Primitives is
    begin
       Safe.Save(Model,Data, Forcing, File_Name);
    end Save;
+
+   -- 3 point median
+   function Median (Raw : in Data_Pairs) return Data_Pairs is
+      Res : Data_Pairs := Raw;
+   begin
+      for I in Raw'First + 1 .. Raw'Last - 1 loop
+         if Raw(I-1).Value < Raw(I).Value then
+            if Raw(I-1).Value >= Raw(I+1).Value then
+               Res(I).Value := Raw(I-1).Value;
+            elsif Raw(I).Value < Raw(I+1).Value then
+               Res(I).Value := Raw(I).Value;
+            else
+               Res(I).Value := Raw(I+1).Value;
+            end if;
+         else
+            if Raw(I-1).Value < Raw(I+1).Value then
+               Res(I).Value := Raw(I-1).Value;
+            elsif Raw(I).Value >= Raw(I+1).Value then
+               Res(I).Value := Raw(I).Value;
+            else
+               Res(I).Value := Raw(I+1).Value;
+            end if;
+         end if;
+      end loop;
+      return Res;
+   end Median;
+
+   function Window (Raw : in Data_Pairs;
+                    Lobe_Width : in Positive) return Data_Pairs is
+      Res : Data_Pairs := Raw;
+   begin
+      for I in Raw'First + Lobe_Width .. Raw'Last - Lobe_Width loop
+         Res(I).Value := 0.0;
+         for J in I - Lobe_Width .. I + Lobe_Width loop
+            Res(I).Value := Res(I).Value +  Raw(J).Value;
+         end loop;
+         Res(I).Value := Res(I).Value / Long_Float(2*Lobe_Width+1);
+      end loop;
+      return Res;
+   end Window;
 
 end GEM.LTE.Primitives;

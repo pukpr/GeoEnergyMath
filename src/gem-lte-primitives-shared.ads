@@ -27,6 +27,7 @@ package GEM.LTE.Primitives.Shared is
          init   : Long_Float;
          order2 : Long_Float;
          order3 : Long_Float;
+         -- LH     : Harmonics(1..126); --36 126
 
          LP     : Long_Periods(1..NLP);
          LT     : Modulations(1..NLT);
@@ -43,7 +44,7 @@ package GEM.LTE.Primitives.Shared is
    --
    procedure Put (P : in Param_S);
 
-   function Get(N_Tides, N_Modulations: in Integer) return Param_S;
+   function Get(N_Tides, N_Modulations : in Integer) return Param_S;
 
    --
    -- from a file -- name of file executable

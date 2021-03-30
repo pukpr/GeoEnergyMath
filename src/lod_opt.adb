@@ -8,9 +8,9 @@ procedure LOD_Opt is
    N :  Positive := System.Task_Info.Number_Of_Processors;
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
-        (NLP    => GEM.LTE.Lib.LPLOD'Length,
+        (NLP    => GEM.LTE.LP1'Length, --Lib.LPLOD'Length,
          NLT    => GEM.LTE.LT0'Length,
-         LP     => GEM.LTE.Lib.LPLOD,
+         LP     => GEM.LTE.LP1, --Lib.LPLOD,
          LT     => GEM.LTE.LT0,
          Offset => -0.00000007634,
          bg     => 0.00000007547,
@@ -26,10 +26,11 @@ procedure LOD_Opt is
          fC     => 0.48449848886,
          fA     => -0.28415079854,
          k0     => 8782.72455399216,
-         level  => 0.26187396614,
+         level  => 0.0, -- 0.26187396614,
          init   => -0.00000005124,
          order2 => 0.000,
-         order3 => 0.000);
+         order3 => 0.000,
+         LH => GEM.LTE.Harm1);
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.LTE.Primitives.Shared.Load(D); -- if available

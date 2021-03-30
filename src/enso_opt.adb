@@ -31,14 +31,13 @@ procedure ENSO_Opt is
          level  => 0.0,
          init   => 0.0063,
          order2 => 0.000001,
-         order3 => 0.000001);
+         order3 => 0.000001
+         -- LH => GEM.LTE.Harm
+        );
 
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.LTE.Primitives.Shared.Load(D); -- if available
-   D.LT(D.LT'Last).Amplitude := 0.000000;
-   D.LT(D.LT'Last-1).Amplitude := 0.000000;
-
    GEM.LTE.Primitives.Shared.Put(D);
    GEM.LTE.Primitives.Solution.Start(D.NLP,D.NLT,N);
    for I in 1..Integer'Last loop
