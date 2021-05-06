@@ -204,6 +204,8 @@ package body GEM.LTE.Primitives is
    end Tide_Series;
 
    -- Graviational model assuming 1/R^3
+   -- Don't use this but see package gem-lte-gravity & gem-ephemeris, which
+   -- uses the exact relationship based on Na (2019)
    function GravityM (Template : in Data_Pairs;
                       Constituents : in Long_Periods;
                       Ref_Time : in Long_Float;
@@ -215,6 +217,7 @@ package body GEM.LTE.Primitives is
    begin
       for I in Template'Range loop
          Time := Template(I).Date - Ref_Time;
+         -- Check Constituents'Last longer than a set value
          declare
             TF : Long_Float := 0.0;
             use Ada.Numerics.Long_Elementary_Functions;
