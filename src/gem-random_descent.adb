@@ -26,7 +26,13 @@ package body GEM.Random_Descent is
    begin
       Ref := Set; -- keep in case of error?
       --for I in Set'Range loop -- a real gradient descent would do all at once
-      if Set(I) = 0.0 or Fixed(Set(I)) then
+      if Set(I) = 0.0 then
+         if Flip_Value < 0.0 then
+            Set(I) := Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
+         else
+            Markov(Set, Ref, Spread);  -- recurse, pick another
+         end if;
+      elsif Fixed(Set(I)) then
          Markov(Set, Ref, Spread);  -- recurse, pick another
       else
          Adjust := 1.0 + Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
