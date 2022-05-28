@@ -52,8 +52,8 @@ package body GEM.LTE.Primitives is
 
    -- a running mean filter, used to damp the inpulse response
    function IIR (Raw : in Data_Pairs;
-                 lagA, lagB, lagC, lagD : in Long_Float;
-                 iA, iB, iC, iD : in Long_Float := 0.0;
+                 lagA, lagB, lagC : in Long_Float;
+                 iA, iB, iC : in Long_Float := 0.0;
                  Start : in Long_Float := Long_Float'First) return  Data_Pairs is
       Res : Data_Pairs := Raw;
       Start_Index : Integer;
@@ -66,17 +66,14 @@ package body GEM.LTE.Primitives is
 
       -- The first few values are sensitive to prior information so can adjust
       -- these for better fits in the early part of the time series.
-      -- The long range skip value = iD goes back 12 months
-      Res(Start_Index + 1).Value := iD; -- -0.000257937;
-      Res(Start_Index + 9).Value := iC; -- 0.006775218;
-      Res(Start_Index + 10).Value := iB; --0.020083924;
-      Res(Start_Index + 11).Value := iA; ---0.006329159;
-      for I in Start_Index + 12 .. Raw'Last loop
-         Res(I).Value := Raw(I-2).Value  -- this should be I-1 for prior step (will fix)
+      Res(Start_Index + 1).Value := iC; -- 0.006775218;
+      Res(Start_Index + 2).Value := iB; --0.020083924;
+      Res(Start_Index + 3).Value := iA; ---0.006329159;
+      for I in Start_Index + 4 .. Raw'Last loop
+         Res(I).Value := Raw(I-1).Value
            + lagA*Res(I-1).Value
            + lagB*Res(I-2).Value
-           + lagC*Res(I-3).Value
-           + lagD*Res(I-11).Value;
+           + lagC*Res(I-3).Value;
       end loop;
       -- Backwards integration
       --  for I in reverse Raw'First .. Start_Index-1 loop
@@ -84,12 +81,11 @@ package body GEM.LTE.Primitives is
       --       - lagA*Res(I+2).Value
       --       - lagB*Res(I+1).Value)/lagC;
       --  end loop;
-      for I in Raw'First+12 .. Start_Index-1 loop
-         Res(I).Value := Raw(I-2).Value  -- this should be I-1 for prior step (will fix)
+      for I in Raw'First+4 .. Start_Index-1 loop
+         Res(I).Value := Raw(I-1).Value
            + lagA*Res(I-1).Value
            + lagB*Res(I-2).Value
-           + lagC*Res(I-3).Value
-           + lagD*Res(I-11).Value;
+           + lagC*Res(I-3).Value;
       end loop;
       return Res;
    end IIR;
@@ -109,11 +105,11 @@ package body GEM.LTE.Primitives is
 
    -- Amplifies a tidal time series with an impulse array (i.e. Dirac comb)
    function Amplify (Raw : in Data_Pairs;
-                     Offset : in Long_Float) return  Data_Pairs is
+                     Offset, Ramp, Start : in Long_Float) return  Data_Pairs is
       Res : Data_Pairs := Raw;
    begin
       for I in Raw'Range loop
-         Res(I).Value := Offset + Raw(I).Value * Impulse(Raw(I).Date);
+         Res(I).Value := Offset + Ramp*(Raw(I).Date-Start) + Raw(I).Value * Impulse(Raw(I).Date);
       end loop;
       return Res;
    end;
@@ -121,6 +117,7 @@ package body GEM.LTE.Primitives is
    -- Conventional tidal series summation or superposition of cycles
    function Tide_Sum (Template : in Data_Pairs;
                       Constituents : in Long_Periods;
+                      Periods : in Long_Periods_Frequency;
                       Ref_Time : in Long_Float;
                       Scaling : in Long_Float;
                       Order2, Order3 : in Long_Float) return Data_Pairs is
@@ -137,16 +134,14 @@ package body GEM.LTE.Primitives is
             for J in Constituents'Range loop
                declare
                   L : Long_Period renames Constituents(J);
-                  Period : Long_Float;
+                  Period : Long_Float := Periods(J);
                begin
                   if Aliased_Period then
-                     if L.Period >= Year/3.01 then
-                        Period := L.Period;
+                     if Period >= Year/3.01 then
+                        Period := Period;
                      else
-                        Period := 1.0/(Year/L.Period - Long_Float(INTEGER(Year/L.Period)));
+                        Period := 1.0/(Year/Period - Long_Float(INTEGER(Year/Period)));
                      end if;
-                  else
-                     Period := L.Period;
                   end if;
                   TF := TF + L.Amplitude*Cos(2.0*Pi*Year/Period*Time + L.Phase);
                end;
@@ -157,96 +152,12 @@ package body GEM.LTE.Primitives is
       return Res;
    end Tide_Sum;
 
-   -- Conventional tidal series summation or superposition of cycles
-   function Tide_Series (Template : in Data_Pairs;
-                      Constituents : in Long_Periods;
-                      Ref_Time : in Long_Float;
-                      Scaling : in Long_Float;
-                      Order2, Order3 : in Long_Float;
-                      Coefficients : in Harmonics) return Data_Pairs is
-      Pi : Long_Float := Ada.Numerics.Pi;
-      Time : Long_Float;
-      Res : Data_Pairs := Template;
-      Tf : Long_Float;
-
-      function Fundamental (Index : in Integer) return Long_Float is
-         L : Long_Period renames Constituents(Index);
-         use Ada.Numerics.Long_Elementary_Functions;
-      begin
-         if Index = 1 then
-            return 1.0;
-         else
-            return L.Amplitude*Cos(2.0*Pi*Year/L.Period*Time + L.Phase);
-         end if;
-      end Fundamental;
-
-      Counter : Integer;
-
-   begin
-      for I in Template'Range loop
-         Tf := 0.0;
-         Counter := 1;
-         Time := Template(I).Date - Ref_Time;
-         for J in Constituents'Range loop
-            for K in Constituents'First .. J loop
-               for L in Constituents'First .. K loop
-                  for M in Constituents'First .. L loop
-                     Tf := Tf + Coefficients (Counter) * Fundamental(J) * Fundamental(K) * Fundamental(L) * Fundamental (M);
-                     Counter := Counter + 1;
-                  end loop;
-               end loop;
-            end loop;
-         end loop;
-         TF := TF + Order2*TF*TF + Order3*TF*TF*TF;
-         Res(I) := (Time, Scaling*TF);
-      end loop;
-      return Res;
-   end Tide_Series;
-
-   -- Graviational model assuming 1/R^3
-   -- Don't use this but see package gem-lte-gravity & gem-ephemeris, which
-   -- uses the exact relationship based on Na (2019)
-   function GravityM (Template : in Data_Pairs;
-                      Constituents : in Long_Periods;
-                      Ref_Time : in Long_Float;
-                      Scaling : in Long_Float) return Data_Pairs is
-      Pi : Long_Float := Ada.Numerics.Pi;
-      Time : Long_Float;
-      Res : Data_Pairs := Template;
-      Last_TF : Long_Float := 0.0;
-   begin
-      for I in Template'Range loop
-         Time := Template(I).Date - Ref_Time;
-         -- Check Constituents'Last longer than a set value
-         declare
-            TF : Long_Float := 0.0;
-            use Ada.Numerics.Long_Elementary_Functions;
-         begin
-            for J in Constituents'Range loop
-               declare
-                  L : Long_Period renames Constituents(J);
-               begin
-                  TF := TF + L.Amplitude*Cos(2.0*Pi*Year/L.Period*Time + L.Phase);
-               end;
-            end loop;
-            TF := 1.0/(1.0+Scaling*TF)**2;
-            if I = Template'First then
-               Res(I) := (Time, 0.0);
-            else
-               TF := TF - Last_TF; -- Differential to remove any bias
-               Res(I) := (Time, TF);
-            end if;
-            Last_TF := TF;
-            -- Text_IO.Put_Line(Res(I).Date'Img & " " & Res(I).Value'Img);
-         end;
-      end loop;
-      return Res;
-   end GravityM;
 
    -- Stands for Laplace's Tidal Equation solution
    -- see Mathematical Geoenergy (2018), Ch.12
    function LTE (Forcing : in Data_Pairs;
                  Wave_Numbers : in Modulations;
+                 Amp_Phase : in Modulations_Amp_Phase;
                  Offset, K0 : in Long_Float := 0.0) return Data_Pairs is
       Res : Data_Pairs := Forcing;
    begin
@@ -254,12 +165,13 @@ package body GEM.LTE.Primitives is
          declare
             LF : Long_Float := 0.0;
             use Ada.Numerics.Long_Elementary_Functions;
+            Pi : Long_Float := Ada.Numerics.Pi;
          begin
             for J in Wave_Numbers'Range loop
                declare
-                  M : Modulation renames Wave_Numbers(J);
+                  M : Modulation renames Amp_Phase(J);
                begin
-                  LF := LF + M.Amplitude*Sin(M.Wavenumber*Res(I).Value + M.Phase);
+                  LF := LF + M.Amplitude*Sin(2.0*Pi*Wave_Numbers(J)*Res(I).Value + M.Phase);
                exception
                   when Constraint_Error =>
                      null;
@@ -275,21 +187,6 @@ package body GEM.LTE.Primitives is
    -- some of the values may not be modifiesd so this is used to identify them
    function Is_Fixed (Value : in Long_Float) return Boolean is
    begin
-      -- If a value happens to have the same value as a tidal period,
-      -- do not modify it and leave it as a fixed value.
-      for I in LP'Range loop
-         if Value = LP(I).Period then
-            return True;
-         end if;
-      end loop;
-      for I in SP'Range loop
-         if Value = SP(I).Period then
-            return True;
-         end if;
-      end loop;
-      if Value = ThirdAnnual then
-         return True;
-      end if;
       return False;
    end Is_Fixed;
 

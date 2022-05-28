@@ -21,8 +21,8 @@ package GEM.LTE.Primitives is
 
    -- Infinite Impulse Response -- integrator
    function IIR (Raw : in Data_Pairs;
-                 lagA, lagB, lagC, lagD : in Long_Float;
-                 iA, iB, iC, iD : in Long_Float := 0.0;
+                 lagA, lagB, lagC : in Long_Float;
+                 iA, iB, iC : in Long_Float := 0.0;
                  Start : in Long_Float := Long_Float'First) return  Data_Pairs;
 
    -- Finite Impulse Response -- smoother
@@ -33,30 +33,21 @@ package GEM.LTE.Primitives is
    generic
       with function Impulse (Time : in Long_Float) return Long_Float;
    function Amplify (Raw : in Data_Pairs;
-                     Offset : in Long_Float) return Data_Pairs;
+                     Offset, Ramp, Start : in Long_Float) return Data_Pairs;
 
    -- LTE models = Superposition of tides + Laplace's Tidal Eqn modulation
 
    function Tide_Sum (Template : in Data_Pairs;
                       Constituents : in Long_Periods;
+                      Periods : in Long_Periods_Frequency;
                       Ref_Time : in Long_Float; -- remove the millenial offset
                       Scaling : in Long_Float;
                       Order2, Order3 : in Long_Float) return Data_Pairs;
 
-   function Tide_Series (Template : in Data_Pairs;
-                         Constituents : in Long_Periods;
-                         Ref_Time : in Long_Float; -- remove the millenial offset
-                         Scaling : in Long_Float;
-                         Order2, Order3 : in Long_Float;
-                         Coefficients : in Harmonics) return Data_Pairs;
-
-   function GravityM (Template : in Data_Pairs;
-                      Constituents : in Long_Periods;
-                      Ref_Time : in Long_Float; -- remove the millenial offset
-                      Scaling : in Long_Float) return Data_Pairs;
 
    function LTE (Forcing : in Data_Pairs;
                  Wave_Numbers : in Modulations;
+                 Amp_Phase : in Modulations_Amp_Phase;
                  Offset, K0 : in Long_Float := 0.0) return Data_Pairs;
 
    -- Query to determine if a Tidal Constituent value should not be changed

@@ -7,17 +7,77 @@ with System.Task_Info;
 with GEM.LTE.Primitives.Shared;
 with Ada.Exceptions;
 with Gnat.Traceback.Symbolic;
-with GEM.Matrices;
+--with GEM.Matrices;
+with Ada.Numerics.Generic_Real_Arrays;
 
 package body GEM.LTE.Primitives.Solution is
 
    -- Multiple Linear Regression types
-   package MLR is new Gem.Matrices (
-      Element_Type => Long_Float,
-      Zero => 0.0,
-      One => 1.0);
-   subtype Vector is MLR.Vector;
-   subtype Matrix is MLR.Matrix;
+--G   package MLR is new Gem.Matrices (
+--G      Element_Type => Long_Float,
+--G      Zero => 0.0,
+--G      One => 1.0);
+--G   subtype Vector is MLR.Vector;
+--G   subtype Matrix is MLR.Matrix;
+   package MLR is new Ada.Numerics.Generic_Real_Arrays (Real => Long_Float);
+   subtype Vector is MLR.Real_Vector;
+   subtype Matrix is MLR.Real_Matrix;
+
+   function To_Matrix
+     (Source        : Vector;
+      Column_Vector : Boolean := True)
+      return          Matrix
+   is
+      Result : Matrix (1 .. 1, Source'Range);
+   begin
+      for Column in Source'Range loop
+         Result (1, Column) := Source (Column);
+      end loop;
+      if Column_Vector then
+         return MLR.Transpose (Result);
+      else
+         return Result;
+      end if;
+   end To_Matrix;
+
+   function To_Row_Vector
+     (Source : Matrix;
+      Column : Positive := 1)
+      return   Vector
+   is
+      Result : Vector (Source'Range (1));
+   begin
+      for Row in Result'Range loop
+         Result (Row) := Source (Row, Column);
+      end loop;
+      return Result;
+   end To_Row_Vector;
+
+   function Regression_Coefficients
+     (Source     : Vector;
+      Regressors : Matrix)
+      return       Vector
+   is
+      Result : Matrix (Regressors'Range (2), 1 .. 1);
+      Nil : Vector(1..0);
+   begin
+      if Source'Length /= Regressors'Length (1) then
+         raise Constraint_Error;
+      end if;
+      declare
+         Regressors_T : constant Matrix := MLR.Transpose (Regressors);
+         use MLR;
+      begin
+         Result := MLR.Inverse (Regressors_T * Regressors) *
+                   Regressors_T *
+                   To_Matrix (Source);
+      end;
+      return To_Row_Vector (Source => Result);
+   exception
+      when Constraint_Error => -- Singular
+         Text_IO.Put_Line("Singular result, converging?");
+         return Nil; -- Source;  -- Doesn't matter, will give a junk result
+   end Regression_Coefficients;
 
    -- Map task threads to multicore processors if available
    task type Thread(CPU : System.Task_Info.CPU_Number;
@@ -219,34 +279,34 @@ package body GEM.LTE.Primitives.Solution is
          Trunc : Integer := Integer((Time - Long_Float'Floor(Time))*Sampling_Per_Year);
       begin
          if Trunc = ImpA then     --775 ~October
-            Value := D.ImpA;
+            Value := D.B.ImpA;
          elsif Trunc = ImpB then  --858 ~November
-            Value := D.ImpB;
+            Value := D.B.ImpB;
          elsif Trunc = ImpC then  --942 ~December
-            Value := D.ImpC;
+            Value := 0.0; -- D.B.ImpC;
          elsif Trunc = ImpD then   --25 ~January
-            Value := D.ImpD;
+            Value := 0.0; -- D.B.ImpD;
          else
             Value := 0.0;
          end if;
-         return Value + D.bg;
+         return Value; -- + D.B.bg;
       end Impulse;
 
       function Impulse_Power (Time : Long_Float) return Long_Float is
          Pi : Long_Float := Ada.Numerics.Pi;
-         Value : Long_Float;
+         Value : Long_Float := 0.0;
          use Ada.Numerics.Long_Elementary_Functions;
       begin
          -- Optimize the impulse power, this will create an even and odd impulse
-         Value := D.ImpA*(abs(COS(2.0*Pi*(Time+D.ImpB))))**D.ImpD
-                 +D.ImpC*(abs(COS(2.0*Pi*(Time+D.ImpB))))**D.ImpD * COS(2.0*Pi*(Time+D.ImpB));
-         return Value + D.bg;
+         --Value := D.B.ImpA*(abs(COS(2.0*Pi*(Time+D.B.ImpB))))**D.B.ImpD
+         --        +D.B.ImpC*(abs(COS(2.0*Pi*(Time+D.B.ImpB))))**D.B.ImpD * COS(2.0*Pi*(Time+D.B.ImpB));
+         return Value; -- + D.B.bg;
       end Impulse_Power;
 
 
       function Impulse_Sin (Time : Long_Float) return Long_Float is
          Pi : Long_Float := Ada.Numerics.Pi;
-         Value : Long_Float;
+         Value : Long_Float := 0.0;
          use Ada.Numerics.Long_Elementary_Functions;
          -- scale*(COS(2*PI*(E2+ip)))^2+D17*(COS(2*PI*(E2+ip)))^3
       begin
@@ -255,11 +315,11 @@ package body GEM.LTE.Primitives.Solution is
          end if;
          if ImpA > 0 then
             -- using the impA & impB env vars as odd & even powers, since they won't be used for impulse
-            Value := D.ImpA*(COS(2.0*Pi*(Time+D.ImpB)))**ImpA+D.ImpC*(COS(2.0*Pi*(Time+D.ImpB)))**ImpB + D.ImpD*COS(2.0*Pi*(Time+D.ImpB));
+            null; -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
          else
             return Impulse_Power(Time);
          end if;
-         return Value + D.bg;
+         return Value; -- + D.B.bg;
       end Impulse_Sin;
 
       procedure Put_CC (Val1, Val2 : in Long_Float;
@@ -301,18 +361,20 @@ package body GEM.LTE.Primitives.Solution is
       -- to modify all float parameters without having knowledge of the abstract
       -- objects, so the data record D is overlaid with a plain array Set
       ------------------------------------------------------------------------
-      Size_Shared : Positive := D'Size/Long_Float'Size - 1; -- subtract header=2 ints
+      Size_Shared : Positive := D.B'Size/Long_Float'Size - 1; -- subtract header=2 ints
 
       package Walker is new GEM.Random_Descent (Fixed => Is_Fixed,
                                                 Set_Range => Size_Shared);
 
       Set, Keep : Walker.LF_Array (1 .. Size_Shared);
-      for Set'Address use D.Offset'Address; -- This may require Ada rec rep clauses
+      for Set'Address use D.B.Offset'Address; -- This may require Ada rec rep clauses
       ------------------------------------------------------------------------
 
       RData : Vector (1 .. Last-First+1);
-      Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. 2 + N_Modulations*2); -- sin + cos mod
+      NM : Integer := GEM.Getenv("NM", N_Modulations);
+      Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. 2 + NM*2); -- sin + cos mod
       use Ada.Numerics.Long_Elementary_Functions;
+      Pi : Long_Float := Ada.Numerics.Pi;
    begin
       --  for I in Data_Records'Range loop
       --     exit when Data_Records(I).Date > TS; -- Finding indices to start
@@ -343,54 +405,46 @@ package body GEM.LTE.Primitives.Solution is
      --       delay 1.0; -- don't do anything if in the lead, let others catch up.
      --    else
 
-         der := 1.0 + D.mD - D.mA - D.mP; -- keeps the integrator stable
+         der := 1.0 - D.B.mA - D.B.mP; -- keeps the integrator stable
          Forcing := IIR(
                          Raw  => Impulse_Amplify(
-                           Raw    => FIR(
-                             --  Raw     => Tide_Series(Template     => Data_Records,
-                             --                      Constituents => D.LP,
-                             --                      Ref_Time     => Ref_Time + D.ShiftT,
-                             --                      Scaling      => Scaling,
-                             --                      Order2       => D.Order2,
-                             --                      Order3       => D.Order3,
-                             --                      Coefficients => D.LH
-                             --                     ),
-                               Raw     => Tide_Sum(Template     => Data_Records,
-                                                   Constituents => D.LP,
-                                                   Ref_Time     => Ref_Time + D.ShiftT,
-                                                   Scaling      => Scaling,
-                                                   Order2       => D.Order2,
-                                                   Order3       => D.Order3
-                                                  ),
-                             Behind  => D.fB,
-                             Current => D.fC,
-                             Ahead   => D.fA),
-                           Offset => D.Offset),
-                         lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
-                         iA => D.init, iB => 0.0, iC => 0.0, iD => 0.0, Start => 0.0*(TS-(Ref_Time + D.ShiftT)));
+                            Raw     => Tide_Sum(Template     => Data_Records,
+                                                Constituents => D.B.LP,
+                                                Periods      => D.A.LPF,
+                                                Ref_Time     => Ref_Time + D.B.ShiftT,
+                                                Scaling      => Scaling,
+                                                Order2       => 0.0, --D.B.Order2,
+                                                Order3       => 0.0  --D.B.Order3
+                                               ),
+                            Offset => D.B.Offset, Ramp => D.B.bg, Start => Data_Records(Data_Records'First).Date),
+                         lagA => der, lagB => D.B.mA, lagC => D.B.mP,
+                         iA => D.B.init, iB => 0.0, iC => 0.0, Start => 0.0*(TS-(Ref_Time + D.B.ShiftT)));
 
-         if MLR_On then
+         if not Forcing_Only then -- MLR_On
             for I in First .. Last loop
                 Factors_Matrix(I-First+1, 2) := Forcing(I).Value;
-                for K in D.LT'Range loop
-                    Factors_Matrix(I-First+1, 3+(K-1)*2) := Sin(D.LT(K).Wavenumber * Forcing(I).Value);
-                    Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(D.LT(K).Wavenumber * Forcing(I).Value);
+                for K in D.B.LT'First .. NM loop
+                    Factors_Matrix(I-First+1, 3+(K-1)*2) := Sin(2.0*Pi*D.B.LT(K) * Forcing(I).Value);
+                    Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(2.0*Pi*D.B.LT(K) * Forcing(I).Value);
                 end loop;
             end loop;
 
             declare
-               Coefficients : constant Vector := MLR.Regression_Coefficients
+               Coefficients : constant Vector := -- MLR.
+                              Regression_Coefficients
                                  (Source     => RData,
                                   Regressors => Factors_Matrix);
                K : Integer := 4;
             begin
-               D.Level := Coefficients(1);
-               D.K0 := Coefficients(2);
+               if Coefficients'Length /= 0 then
+               D.A.Level := Coefficients(1);
+               D.A.K0 := Coefficients(2);
                for I in 1 .. (Coefficients'Last-2)/2 loop
-                  D.LT(K/2-1).Amplitude := Sqrt(Coefficients(K-1)*Coefficients(K-1) + Coefficients(K)*Coefficients(K));
-                  D.LT(K/2-1).Phase := Arctan(Coefficients(K), Coefficients(K-1));
+                  D.A.LTAP(K/2-1).Amplitude := Sqrt(Coefficients(K-1)*Coefficients(K-1) + Coefficients(K)*Coefficients(K));
+                  D.A.LTAP(K/2-1).Phase := Arctan(Coefficients(K), Coefficients(K-1));
                   K := K+2;
-               end loop;
+                  end loop;
+               end if;
             end;
          end if;
 
@@ -399,7 +453,9 @@ package body GEM.LTE.Primitives.Solution is
          else
             -- Forcing := Median(Forcing);
             Model := LTE(Forcing => Forcing,
-                         Wave_Numbers => D.Lt, Offset => D.level, K0 => D.K0);  -- D.LT GEM.LTE.LT0
+                         Wave_Numbers => D.B.Lt,
+                         Amp_Phase => D.A.LTAP,
+                         Offset => D.A.level, K0 => D.A.K0);  -- D.LT GEM.LTE.LT0
 
             -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
             Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
@@ -470,8 +526,8 @@ package body GEM.LTE.Primitives.Solution is
             Spread := Spread_Min + Spread_Max*(1.0-LEF.Cos(Progress_Cycle/Spread_Cycle));
          end if;
          if Calibrate then
-            Walker.Markov(D.Init, Init_Keep, Spread);
-            Walker.Markov(D.shiftT, Init_Keep, Spread);
+            Walker.Markov(D.B.Init, Init_Keep, Spread);
+            Walker.Markov(D.B.shiftT, Init_Keep, Spread);
          else
             Walker.Markov(Set, Keep, Spread);
          end if;
@@ -480,7 +536,33 @@ package body GEM.LTE.Primitives.Solution is
       Monitor.Stop;
       if Best_Client = ID then
          GEM.LTE.Primitives.Shared.Save(DKeep);
-         Walker.Dump(Keep); -- Print results of last best evaluation,
+         -- Walker.Dump(Keep); -- Print results of last best evaluation,
+         Ada.Long_Float_Text_IO.Put(D.B.Offset, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :offset:");
+         Ada.Long_Float_Text_IO.Put(D.B.Bg, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :bg:");
+         Ada.Long_Float_Text_IO.Put(D.B.ImpA, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :impA:");
+         Ada.Long_Float_Text_IO.Put(D.B.ImpB, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :impB:");
+         Ada.Long_Float_Text_IO.Put(D.B.mA, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :mA:");
+         Ada.Long_Float_Text_IO.Put(D.B.mP, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :mP:");
+         Ada.Long_Float_Text_IO.Put(D.B.shiftT, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :shiftT:");
+         Ada.Long_Float_Text_IO.Put(D.B.init, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :init:");
+         Text_IO.Put_Line("---- LTE");
+         for I in D.B.LT'Range loop
+            Ada.Long_Float_Text_IO.Put(D.B.LT(I), Fore=>4, Aft=>11, Exp=>0);
+            Text_IO.Put(", ");
+            Ada.Long_Float_Text_IO.Put(D.A.LTAP (I).Amplitude, Fore=>4, Aft=>11, Exp=>0);
+            Text_IO.Put(", ");
+            Ada.Long_Float_Text_IO.Put(D.A.LTAP(I).Phase, Fore=>4, Aft=>11, Exp=>0);
+            Text_IO.New_Line;
+         end loop;
+         Text_IO.Put_Line("---- Tidal");
+         for I in D.B.LP'Range loop
+            Ada.Long_Float_Text_IO.Put(D.A.LPF(I), Fore=>4, Aft=>11, Exp=>0);
+            Text_IO.Put(", ");
+            Ada.Long_Float_Text_IO.Put(D.B.LP(I).Amplitude, Fore=>4, Aft=>11, Exp=>0);
+            Text_IO.Put(", ");
+            Ada.Long_Float_Text_IO.Put(D.B.LP(I).Phase, Fore=>4, Aft=>11, Exp=>0);
+            Text_IO.New_Line;
+         end loop;
          Save(KeepModel, Data_Records, Forcing);    -- Should also save to file
          if Split_Training then
             Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);
@@ -500,38 +582,5 @@ package body GEM.LTE.Primitives.Solution is
 
    end Dipole_Model;
 
-   --  procedure Print_Model (D : in GEM.LTE.Primitives.Shared.Param_S;
-   --                         File_Name : in String := "nino34_soi.txt") is
-   --     Data_Records : Data_Pairs := Make_Data(File_Name);
-   --     Forcing  : Data_Pairs := Data_Records;
-   --     Model    : Data_Pairs := Data_Records;
-   --     Scaling : constant Long_Float := GEM.Getenv("SCALING", 0.5);
-   --     Filter : constant Long_Float := GEM.Getenv("FILTER", 0.33333333);
-   --     RMS_Data : Long_Float := 0.0;
-   --  begin
-   --     Forcing := IIR(
-   --                        Raw  => Impulse_Amplify(
-   --                          Raw    => FIR(
-   --                            Raw     => Tide_Sum(Template     => Data_Records,
-   --                                                Constituents => D.LP,
-   --                                                Ref_Time     => Ref_Time + D.ShiftT,
-   --                                                Scaling      => Scaling,
-   --                                                Order2       => D.Order2,
-   --                                                Order3       => D.Order3
-   --                                               ),
-   --                            Behind  => D.fB,
-   --                            Current => D.fC,
-   --                            Ahead   => D.fA),
-   --                          Offset => D.Offset),
-   --                        lagA => der, lagB => D.mA, lagC => D.mP, lagD => D.mD,
-   --                        iA => D.init, iB => 0.0, iC => 0.0, iD => 0.0);
-   --
-   --     Model := LTE(Forcing => Forcing,
-   --                  Wave_Numbers => D.Lt, Offset => D.level, K0 => D.K0);  -- D.LT GEM.LTE.LT0
-   --
-   --     Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
-   --
-   --     Save(Model, Data_Records, Forcing);
-   --  end Print_Model;
-   --
+
 end GEM.LTE.Primitives.Solution;

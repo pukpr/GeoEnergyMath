@@ -1,6 +1,38 @@
 
 package GEM.LTE.Primitives.Shared is
 
+   type Param_A (NLP, NLT : Integer) is
+      record
+         k0     : Long_Float;
+         level  : Long_Float;
+         LPF    : Long_Periods_Frequency(1..NLP);  -- Fixed
+         LTAP   : Modulations_Amp_Phase(1..NLT); -- Calculated
+      end record;
+
+   type Param_B (NLP, NLT : Integer) is
+      record
+         Offset : Long_Float;   -- Random walk values
+         bg     : Long_Float;
+         ImpA   : Long_Float;
+         ImpB   : Long_Float;
+         --ImpC   : Long_Float;
+         --ImpD   : Long_Float;
+
+         mA     : Long_Float;
+         mP     : Long_Float;
+         --mD     : Long_Float;
+         shiftT : Long_Float;
+         --fB     : Long_Float;
+         --fC     : Long_Float;
+         --fA     : Long_Float;
+         init   : Long_Float;
+         --order2 : Long_Float;
+         --order3 : Long_Float;
+
+         LP     : Long_Periods(1..NLP);
+         LT     : Modulations(1..NLT);
+      end record;
+
    -- Record structure used for optimization sharing
    -- This could use the benefit of Ada record representation clauses,
    -- but as it is with GNAT compiler, there is no dope information
@@ -8,31 +40,10 @@ package GEM.LTE.Primitives.Shared is
 
    type Param_S (NLP, NLT : Integer) is
       record
-         Offset : Long_Float;
-         bg     : Long_Float;
-         ImpA   : Long_Float;
-         ImpB   : Long_Float;
-         ImpC   : Long_Float;
-         ImpD   : Long_Float;
-
-         mA     : Long_Float;
-         mP     : Long_Float;
-         mD     : Long_Float;
-         shiftT : Long_Float;
-         fB     : Long_Float;
-         fC     : Long_Float;
-         fA     : Long_Float;
-         k0     : Long_Float;
-         level  : Long_Float;
-         init   : Long_Float;
-         order2 : Long_Float;
-         order3 : Long_Float;
-         -- LH     : Harmonics(1..126); --36 126
-
-         LP     : Long_Periods(1..NLP);
-         LT     : Modulations(1..NLT);
-
+         A : Param_A(NLP, NLT);
+         B : Param_B(NLP, NLT);
       end record;
+
 
    -- don't think this is necessary but watch for cases where the
    -- compiler may optimize away reads and treat the data as unused
