@@ -265,6 +265,60 @@ package body GEM.LTE.Primitives is
       return 1.0 - sqrt(sum_XY)/Ref;
    end RMS;
 
+   function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float is
+      use Ada.Numerics.Long_Elementary_Functions;
+      Pi : Long_Float := Ada.Numerics.Pi;
+      Value, Sum : Long_Float := 0.0;
+      F : Long_Float := 0.1;
+      Mult : Long_Float := 1.05;
+      S, C : Long_Float; -- cumulative
+      N : Integer := 1;
+   begin
+      loop
+         S := 0.0;
+         C := 0.0;
+         for I in X'Range loop
+            S := S + Sin(2.0*Pi*F*X(I).Value*Y(I).Value);
+            C := C + Cos(2.0*Pi*F*X(I).Value*Y(I).Value);
+         end loop;
+         Value := Value + (S*S + C*C);
+         Sum := Sum + Sqrt(S*S + C*C);
+         F := F*Mult;
+         exit when F > 1000.0;
+         N := N + 1;
+      end loop;
+      Sum := Sum*Sum/Long_Float(N*N) ;
+      -- Text_IO.Put_Line(Value'Img & Sum'Img);
+      Value := (Value-Sum)/Sum;
+      return Value;
+   end Min_Entropy_Power_Spectrum;
+
+   --  function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float is
+   --     use Ada.Numerics.Long_Elementary_Functions;
+   --     Pi : Long_Float := Ada.Numerics.Pi;
+   --     Value, Sum : Long_Float := 0.0;
+   --     F : Long_Float := 0.1;
+   --     Mult : Long_Float := 1.05;
+   --     S, C : Long_Float; -- cumulative
+   --     A : Long_Float;
+   --  begin
+   --     loop
+   --        S := 0.0;
+   --        C := 0.0;
+   --        A := 0.0;
+   --        for I in X'Range loop
+   --           S := S + Sin(2.0*Pi*F*X(I).Value*Y(I).Value);
+   --           C := C + Cos(2.0*Pi*F*X(I).Value*Y(I).Value);
+   --           A := A + abs(X(I).Value*Y(I).Value);
+   --        end loop;
+   --        Value := Value + (S*S + C*C)*F;
+   --        Sum := Sum + A*F;
+   --        F := F*Mult;
+   --        exit when F > 1000.0;
+   --     end loop;
+   --     return Value/Sum;
+   --  end Min_Entropy_Power_Spectrum;
+   --
    procedure Dump (Model, Data : in Data_Pairs;
                   Run_Time : Long_Float := 200.0) is
    begin

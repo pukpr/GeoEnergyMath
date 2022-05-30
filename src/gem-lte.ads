@@ -22,7 +22,9 @@ package GEM.LTE is
          Period : Long_Float; --
       end record;
 
-   Doodson_Args : array (Positive range <>) of Doodson_Argument :=
+   type Doodson_List is array (Positive range <>) of Doodson_Argument;
+
+   Doodson_Args : Doodson_List :=
      ( (3, 0,-1, 2, 0.0),
        (1,-1, 0, 0, 0.0),
        (0, 0, 1,-1, 0.0),
@@ -53,6 +55,15 @@ package GEM.LTE is
        (3, 0, 1, 1, 0.0),
        (2, 0, 0, 1, 0.0),
        (1, 0, 1, 1, 0.0) );
+
+  QBO_Args : Doodson_List :=
+     ( (0, 1, 0, 0, 0.0),
+       (0, 2, 0, 0, 0.0),
+       (1, 0, 0, 0, 0.0),
+       (1, 0, 0, 1, 0.0),
+       (2, 0,-2, 1, 0.0)
+
+ );
 
 
 
@@ -114,8 +125,10 @@ package GEM.LTE is
    --
 
    LP : Long_Periods (Doodson_Args'Range);
-
    LPF : Long_Periods_Frequency (Doodson_Args'Range);
+
+   QBO : Long_Periods (QBO_Args'Range);
+   QBOF : Long_Periods_Frequency (QBO_Args'Range);
 
 
    LTM : constant Modulations := (

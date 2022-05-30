@@ -68,6 +68,9 @@ package GEM.LTE.Primitives is
    function RMS (X, Y : in Data_Pairs;
                  Ref, Offset : in Long_Float) return Long_Float;
 
+   -- Minimum Entropy
+   function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float;
+
    -- Dumps to stdIO all the data up to time corresponding to run_time
    procedure Dump (Model, Data : in Data_Pairs;
                    Run_Time : Long_Float := 200.0);

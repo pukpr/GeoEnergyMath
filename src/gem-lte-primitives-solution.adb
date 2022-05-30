@@ -244,10 +244,10 @@ package body GEM.LTE.Primitives.Solution is
       DKeep : Shared.Param_S(N_Tides, N_Modulations) := D;
       D0 : constant Shared.Param_S := D;  -- reference
 
-      ImpA : constant Integer := GEM.Getenv("IMPA", 9); -- Defaults for ENSO
-      ImpB : constant Integer := GEM.Getenv("IMPB", 10);
-      ImpC : constant Integer := GEM.Getenv("IMPC", 11);
-      ImpD : constant Integer := GEM.Getenv("IMPD", 0);
+      ImpA : constant Integer := GEM.Getenv("IMPA", 3); -- Defaults for ENSO
+      ImpB : constant Integer := GEM.Getenv("IMPB", 9);
+      ImpC : constant Integer := GEM.Getenv("IMPC", -1);
+      ImpD : constant Integer := GEM.Getenv("IMPD", -1);
 
       Maximum_Loops : constant Long_Integer := GEM.Getenv("MAXLOOPS", 100_000);
       Threshold : constant Integer := GEM.Getenv("THRESHOLD", 99);
@@ -257,6 +257,7 @@ package body GEM.LTE.Primitives.Solution is
       Spread_Cycle : constant Long_Float := GEM.Getenv("SPREAD_CYCLE", 1000.0);
       Catchup : constant Boolean := GEM.Getenv("THRESHOLD_ACTION", "RESTART") = "CATCHUP";
       RMS_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "RMS";
+      Min_Entropy : constant Boolean := GEM.Getenv("METRIC", "CC") = "ME";
       Sin_Impulse : constant Boolean := GEM.Getenv("IMPULSE", "DELTA") = "SIN";
       Sampling_Per_Year : constant Long_Float := GEM.Getenv("SAMPLING", 12.0);
       Filter : constant Long_Float := GEM.Getenv("FILTER", 0.33333333);
@@ -269,6 +270,8 @@ package body GEM.LTE.Primitives.Solution is
       begin
          if RMS_Metric then
             return (RMS(X,Y,RMS_Data, 0.0) + CC(X,Y))/2.0;
+         elsif Min_Entropy then
+            return Min_Entropy_Power_Spectrum(X,Y);
          else
             return CC(X,Y);
          end if;
@@ -282,9 +285,9 @@ package body GEM.LTE.Primitives.Solution is
          if Trunc = ImpA then
             Value := D.B.ImpA;
          elsif Trunc = ImpB then
-            Value := -D.B.ImpA + D.B.ImpB; -- delta
+            Value := -D.B.ImpA + D.B.ImpB; -- delta on inverse
          elsif Trunc = ImpC then
-            Value := 0.0; -- D.B.ImpC;
+            Value := D.B.ImpB; -- perturbation
          elsif Trunc = ImpD then
             Value := 0.0; -- D.B.ImpD;
          else
@@ -419,7 +422,7 @@ package body GEM.LTE.Primitives.Solution is
             Forcing(I).Value := Forcing(I).Value + Impulse_Residual*Impulses(I).Value;
          end loop;
 
-         if not Forcing_Only then -- MLR_On
+         if not (Forcing_Only or Min_Entropy) then -- MLR_On
             for I in First .. Last loop
                 Factors_Matrix(I-First+1, 2) := Forcing(I).Value;
                 for K in D.B.LT'First .. NM loop  -- D.B.LT'First = 1
@@ -453,7 +456,7 @@ package body GEM.LTE.Primitives.Solution is
             end;
          end if;
 
-         if Forcing_Only then
+         if Forcing_Only or Min_Entropy then
             Model := Forcing;
          else
             -- Forcing := Median(Forcing);
