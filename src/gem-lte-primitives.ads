@@ -1,4 +1,3 @@
-
 package GEM.LTE.Primitives is
 
    type Pair is  -- A pair of values, such as in monthly temperature time-series
@@ -38,8 +37,8 @@ package GEM.LTE.Primitives is
    -- LTE models = Superposition of tides + Laplace's Tidal Eqn modulation
 
    function Tide_Sum (Template : in Data_Pairs;
-                      Constituents : in Long_Periods;
-                      Periods : in Long_Periods_Frequency;
+                      Constituents : in Long_Periods_Amp_Phase;
+                      Periods : in Long_Periods;
                       Ref_Time : in Long_Float; -- remove the millenial offset
                       Scaling : in Long_Float;
                       Order2, Order3 : in Long_Float) return Data_Pairs;
@@ -53,6 +52,18 @@ package GEM.LTE.Primitives is
    -- Query to determine if a Tidal Constituent value should not be changed
    -- This uses a float comparison and is really only used for tidal periods
    function Is_Fixed (Value : in Long_Float) return Boolean;
+
+
+   procedure Regression_Factors (Data_Records : in Data_Pairs;  -- Time series
+                                 First, Last,  -- Training Interval
+                                 NM : in Positive; -- # modulations
+                                 Forcing : in Data_Pairs;  -- Value @ Time
+                                 -- Factors_Matrix : in out Matrix;
+                                 DBLT : in Periods;
+                                 DALTAP : out Amp_Phases;
+                                 DALEVEL : out Long_Float;
+                                 DAK0 : out Long_Float;
+                                 Secular_Trend : out Long_Float);
 
    --
    -- Utility procedures
@@ -70,6 +81,8 @@ package GEM.LTE.Primitives is
 
    -- Minimum Entropy
    function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float;
+
+   function Is_Minimum_Entropy return Boolean;
 
    -- Dumps to stdIO all the data up to time corresponding to run_time
    procedure Dump (Model, Data : in Data_Pairs;

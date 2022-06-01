@@ -2,9 +2,16 @@ with Text_IO;
 with Ada.Long_Float_Text_IO;
 with Ada.Numerics.Long_Elementary_Functions;
 with Ada.Exceptions;
+with Ada.Numerics.Generic_Real_Arrays;
 
 package body GEM.LTE.Primitives is
    Aliased_Period : constant Boolean := GEM.Getenv("ALIAS", FALSE);
+   Min_Entropy : constant Boolean := GEM.Getenv("METRIC", "") = "ME";
+
+   function Is_Minimum_Entropy return Boolean is
+   begin
+      return Min_Entropy;
+   end Is_Minimum_Entropy;
 
    function File_Lines (Name : String) return Integer is
       Data  : Text_IO.File_Type;
@@ -116,8 +123,8 @@ package body GEM.LTE.Primitives is
 
    -- Conventional tidal series summation or superposition of cycles
    function Tide_Sum (Template : in Data_Pairs;
-                      Constituents : in Long_Periods;
-                      Periods : in Long_Periods_Frequency;
+                      Constituents : in Long_Periods_Amp_Phase;
+                      Periods : in Long_Periods;
                       Ref_Time : in Long_Float;
                       Scaling : in Long_Float;
                       Order2, Order3 : in Long_Float) return Data_Pairs is
@@ -133,17 +140,17 @@ package body GEM.LTE.Primitives is
          begin
             for J in Constituents'Range loop
                declare
-                  L : Long_Period renames Constituents(J);
+                  L : Amp_Phase renames Constituents(J);
                   Period : Long_Float := Periods(J);
                begin
                   if Aliased_Period then
-                     if Period >= Year/3.01 then
+                     if Period >= Year_Length/3.01 then
                         Period := Period;
                      else
-                        Period := 1.0/(Year/Period - Long_Float(INTEGER(Year/Period)));
+                        Period := 1.0/(Year_Length/Period - Long_Float(INTEGER(Year_Length/Period)));
                      end if;
                   end if;
-                  TF := TF + L.Amplitude*Cos(2.0*Pi*Year/Period*Time + L.Phase);
+                  TF := TF + L.Amplitude*Cos(2.0*Pi*Year_Length/Period*Time + L.Phase); --!
                end;
             end loop;
             Res(I) := (Time, Scaling * (TF + Order2*TF*TF + Order3*TF*TF*TF) );
@@ -169,7 +176,7 @@ package body GEM.LTE.Primitives is
          begin
             for J in Wave_Numbers'Range loop
                declare
-                  M : Modulation renames Amp_Phase(J);
+                  M : GEM.LTE.Amp_Phase renames Amp_Phase(J);
                begin
                   LF := LF + M.Amplitude*Sin(2.0*Pi*Wave_Numbers(J)*Res(I).Value + M.Phase);
                exception
@@ -265,59 +272,69 @@ package body GEM.LTE.Primitives is
       return 1.0 - sqrt(sum_XY)/Ref;
    end RMS;
 
+   Pi : constant Long_Float := Ada.Numerics.Pi;
+   Mult : constant Long_Float := 1.02;  --1.05
+   F_Start : constant Long_Float := 1.0; --0.1
+   F_End : constant Long_Float := 1000.0;
+
    function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float is
       use Ada.Numerics.Long_Elementary_Functions;
-      Pi : Long_Float := Ada.Numerics.Pi;
       Value, Sum : Long_Float := 0.0;
-      F : Long_Float := 0.1;
-      Mult : Long_Float := 1.05;
       S, C : Long_Float; -- cumulative
+      F : Long_Float := F_Start;
       N : Integer := 1;
    begin
       loop
          S := 0.0;
          C := 0.0;
          for I in X'Range loop
-            S := S + Sin(2.0*Pi*F*X(I).Value*Y(I).Value);
-            C := C + Cos(2.0*Pi*F*X(I).Value*Y(I).Value);
+            S := S + Sin(2.0*Pi*F*X(I).Value)*Y(I).Value;
+            C := C + Cos(2.0*Pi*F*X(I).Value)*Y(I).Value;
          end loop;
          Value := Value + (S*S + C*C);
          Sum := Sum + Sqrt(S*S + C*C);
          F := F*Mult;
-         exit when F > 1000.0;
+         exit when F > F_End;
          N := N + 1;
       end loop;
       Sum := Sum*Sum/Long_Float(N*N) ;
-      -- Text_IO.Put_Line(Value'Img & Sum'Img);
       Value := (Value-Sum)/Sum;
+      --Text_IO.Put_Line(Value'Img & Sum'Img);
       return Value;
    end Min_Entropy_Power_Spectrum;
 
-   --  function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float is
-   --     use Ada.Numerics.Long_Elementary_Functions;
-   --     Pi : Long_Float := Ada.Numerics.Pi;
-   --     Value, Sum : Long_Float := 0.0;
-   --     F : Long_Float := 0.1;
-   --     Mult : Long_Float := 1.05;
-   --     S, C : Long_Float; -- cumulative
-   --     A : Long_Float;
-   --  begin
-   --     loop
-   --        S := 0.0;
-   --        C := 0.0;
-   --        A := 0.0;
-   --        for I in X'Range loop
-   --           S := S + Sin(2.0*Pi*F*X(I).Value*Y(I).Value);
-   --           C := C + Cos(2.0*Pi*F*X(I).Value*Y(I).Value);
-   --           A := A + abs(X(I).Value*Y(I).Value);
-   --        end loop;
-   --        Value := Value + (S*S + C*C)*F;
-   --        Sum := Sum + A*F;
-   --        F := F*Mult;
-   --        exit when F > 1000.0;
-   --     end loop;
-   --     return Value/Sum;
-   --  end Min_Entropy_Power_Spectrum;
+   procedure ME_Power_Spectrum (Forcing, Model, Data : in Data_Pairs;
+                             Model_Spectrum, Data_Spectrum : out Data_Pairs) is
+      use Ada.Numerics.Long_Elementary_Functions;
+      Model_S : Data_Pairs(Model'Range);
+      Data_S : Data_Pairs(Model'Range);
+      Value, Sum : Long_Float := 0.0;
+      F : Long_Float := F_Start;
+      S, C, SM, CM : Long_Float; -- cumulative
+      N : Integer := 1;
+   begin
+      for J in Data'Range loop
+         S := 0.0;
+         C := 0.0;
+         SM := 0.0;
+         CM := 0.0;
+         for I in Data'Range loop
+            S := S + Sin(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
+            C := C + Cos(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
+            SM := SM + Sin(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
+            CM := CM + Cos(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
+         end loop;
+         Data_S(J).Date := F;
+         Data_S(J).Value := (S*S + C*C);
+         Model_S(J).Date := F;
+         Model_S(J).Value := (SM*SM + CM*CM);
+         F := F*Mult;
+      end loop;
+      Model_Spectrum := Model_S;
+      Data_Spectrum := Data_S;
+   end ME_Power_Spectrum;
+
+
    --
    procedure Dump (Model, Data : in Data_Pairs;
                   Run_Time : Long_Float := 200.0) is
@@ -354,11 +371,17 @@ package body GEM.LTE.Primitives is
       procedure Save (Model, Data, Forcing : in Data_Pairs;
                       File_Name : in String) is
          FT : Text_IO.File_Type;
+         Model_S : Data_Pairs := Model;
+         Data_S : Data_Pairs := Data;
       begin
          Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
+         if Is_Minimum_Entropy then
+            ME_Power_Spectrum (Forcing=>Model, Model=>Forcing, Data=>Data,
+                            Model_Spectrum=>Model_S, Data_Spectrum=>Data_S);
+         end if;
          for I in Data'Range loop
-            Text_IO.Put_Line(FT, Data(I).Date'Img & ", " & Model(I).Value'Img &
-                               ", " & Data(I).Value'Img & ", " & Forcing(I).Value'Img);
+            Text_IO.Put_Line(FT, Data_S(I).Date'Img & ", " & Model_S(I).Value'Img &
+                               ", " & Data_S(I).Value'Img & ", " & Forcing(I).Value'Img);
          end loop;
          Text_IO.Close(FT);
       end Save;
@@ -409,5 +432,117 @@ package body GEM.LTE.Primitives is
       end loop;
       return Res;
    end Window;
+
+
+   -- Regression procedures
+
+   package MLR is new Ada.Numerics.Generic_Real_Arrays (Real => Long_Float);
+   subtype Vector is MLR.Real_Vector;
+   subtype Matrix is MLR.Real_Matrix;
+
+   function To_Matrix
+     (Source        : Vector;
+      Column_Vector : Boolean := True)
+      return          Matrix
+   is
+      Result : Matrix (1 .. 1, Source'Range);
+   begin
+      for Column in Source'Range loop
+         Result (1, Column) := Source (Column);
+      end loop;
+      if Column_Vector then
+         return MLR.Transpose (Result);
+      else
+         return Result;
+      end if;
+   end To_Matrix;
+
+   function To_Row_Vector
+     (Source : Matrix;
+      Column : Positive := 1)
+      return   Vector
+   is
+      Result : Vector (Source'Range (1));
+   begin
+      for Row in Result'Range loop
+         Result (Row) := Source (Row, Column);
+      end loop;
+      return Result;
+   end To_Row_Vector;
+
+   function Regression_Coefficients
+     (Source     : Vector;
+      Regressors : Matrix)
+      return       Vector
+   is
+      Result : Matrix (Regressors'Range (2), 1 .. 1);
+      Nil : Vector(1..0);
+   begin
+      if Source'Length /= Regressors'Length (1) then
+         raise Constraint_Error;
+      end if;
+      declare
+         Regressors_T : constant Matrix := MLR.Transpose (Regressors);
+         use MLR;
+      begin
+         Result := MLR.Inverse (Regressors_T * Regressors) *
+                   Regressors_T *
+                   To_Matrix (Source);
+      end;
+      return To_Row_Vector (Source => Result);
+   exception
+      when Constraint_Error => -- Singular
+         Text_IO.Put_Line("Singular result, converging?");
+         return Nil; -- Source;  -- Doesn't matter, will give a junk result
+   end Regression_Coefficients;
+
+
+   procedure Regression_Factors (Data_Records : in Data_Pairs;
+                                 First, Last,  -- Training Interval
+                                 NM : in Positive; -- # modulations
+                                 Forcing : in Data_Pairs;  -- Value @ Time
+                                 -- Factors_Matrix : in out Matrix;
+                                 DBLT : in Periods;
+                                 DALTAP : out Amp_Phases;
+                                 DALEVEL : out Long_Float;
+                                 DAK0 : out Long_Float;
+                                 Secular_Trend : out Long_Float) is
+
+      use Ada.Numerics.Long_Elementary_Functions;
+      Pi : Long_Float := Ada.Numerics.Pi;
+      Num_Coefficients : constant Integer := 2 + NM*2 + 1; -- !!! sin + cos mod
+      RData : Vector (1 .. Last-First+1);
+      Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. Num_Coefficients);
+   begin
+         for I in First .. Last loop
+             RData(I-First+1) := Data_Records(I).Value;
+             Factors_Matrix(I-First+1, 1) := 1.0;  -- DC offset
+             Factors_Matrix(I-First+1, 2) := Forcing(I).Value;
+             for K in DBLT'First .. NM loop  -- D.B.LT'First = 1
+                 Factors_Matrix(I-First+1, 3+(K-1)*2) := Sin(2.0*Pi*DBLT(K) * Forcing(I).Value);
+                 Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(2.0*Pi*DBLT(K) * Forcing(I).Value);
+             end loop;
+             Factors_Matrix(I-First+1, Num_Coefficients) := Forcing(I).Date;
+         end loop;
+
+         declare
+            Coefficients : constant Vector :=
+                           Regression_Coefficients
+                              (Source     => RData,
+                               Regressors => Factors_Matrix);
+            K : Integer := 4;
+         begin
+            if Coefficients'Length /= 0 then
+               DALevel := Coefficients(1);
+               DAK0 := Coefficients(2);
+               for I in 1 .. NM loop  -- if odd
+                  DALTAP(K/2-1).Amplitude := Sqrt(Coefficients(K-1)*Coefficients(K-1) + Coefficients(K)*Coefficients(K));
+                  DALTAP(K/2-1).Phase := Arctan(Coefficients(K), Coefficients(K-1));
+                  K := K+2;
+               end loop;
+               Secular_Trend := Coefficients(Num_Coefficients); --!!!
+            end if;
+         end;
+   end Regression_Factors;
 
 end GEM.LTE.Primitives;

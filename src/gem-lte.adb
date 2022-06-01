@@ -14,14 +14,14 @@ begin
 
    for I in Doodson_Args'Range loop
       Doodson_Args(I).Period := Doodson(I, Doodson_Args);
-      LPF(I) := Doodson_Args(I).Period;
-      LP(I) := (0.01, 1.0);
+      LP(I) := Doodson_Args(I).Period;
+      LPAP(I) := (0.01, 1.0);
    end loop;
 
    for I in QBO_Args'Range loop
       QBO_Args(I).Period := Doodson(I, QBO_Args);
-      QBOF(I) := QBO_Args(I).Period;
-      QBO(I) := (0.01, 1.0);
+      QBO(I) := QBO_Args(I).Period;
+      QBOAP(I) := (0.01, 1.0);
    end loop;
 
 end GEM.LTE;

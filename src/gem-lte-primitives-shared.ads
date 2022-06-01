@@ -5,7 +5,7 @@ package GEM.LTE.Primitives.Shared is
       record
          k0     : Long_Float;
          level  : Long_Float;
-         LPF    : Long_Periods_Frequency(1..NLP);  -- Fixed
+         LP     : Long_Periods(1..NLP);  -- Fixed
          LTAP   : Modulations_Amp_Phase(1..NLT); -- Calculated
       end record;
 
@@ -29,7 +29,7 @@ package GEM.LTE.Primitives.Shared is
          --order2 : Long_Float;
          --order3 : Long_Float;
 
-         LP     : Long_Periods(1..NLP);
+         LPAP   : Long_Periods_Amp_Phase(1..NLP);
          LT     : Modulations(1..NLT);
       end record;
 

@@ -17,12 +17,12 @@ procedure ENSO_Opt is
          level  => 0.0,
          NLP    => GEM.LTE.LP'Length,
          NLT    => GEM.LTE.LTM'Length,
-         LPF    => GEM.LTE.LPF,
+         LP     => GEM.LTE.LP,
          LTAP   => GEM.LTE.LTAP),
       B =>
         (NLP    => GEM.LTE.LP'Length,
          NLT    => GEM.LTE.LTM'Length,
-         LP     => GEM.LTE.LP,
+         LPAP   => GEM.LTE.LPAP,
          LT     => GEM.LTE.LTM,
          Offset => 0.0,
          bg     => 0.0,
@@ -37,8 +37,19 @@ procedure ENSO_Opt is
 begin
    Text_IO.Put_Line(N'Img & " processors available");
    GEM.LTE.Primitives.Shared.Load(D); -- if available
-   --D.B.LP(8).Amplitude := 0.02;
-   --D.B.LP(9).Amplitude := 0.001;
+   --D.B.ImpB := 0.0;
+   --  D.B.LT(1) := 1.2;
+   --  D.B.LT(2) := 12.0;
+   --  D.B.LT(3) := D.B.LT(2)*2.0;
+   --  D.B.LT(4) := D.B.LT(2)*3.0;
+   --  D.B.LT(5) := D.B.LT(2)*4.0;
+   --  D.B.LT(6) := D.B.LT(2)*5.0;
+   --D.B.LT(7) := D.B.LT(2)*6.0;
+   --  D.B.LT(8) := D.B.LT(2)*7.0;
+   --  D.B.LT(9) := D.B.LT(2)*11.0;
+   --  D.B.LT(10) := D.B.LT(2)*22.0;
+   --  D.B.LT(11) := D.B.LT(2)*823.0/12.0;
+   --  --D.B.LP(9).Amplitude := 0.001;
    --D.B.LT(1) := 0.1;
    GEM.LTE.Primitives.Shared.Put(D);
    GEM.LTE.Primitives.Solution.Start(D.NLP,D.NLT,N);

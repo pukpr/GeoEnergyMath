@@ -19,65 +19,66 @@ package body GEM.LTE.Primitives.Solution is
 --G      One => 1.0);
 --G   subtype Vector is MLR.Vector;
 --G   subtype Matrix is MLR.Matrix;
-   package MLR is new Ada.Numerics.Generic_Real_Arrays (Real => Long_Float);
-   subtype Vector is MLR.Real_Vector;
-   subtype Matrix is MLR.Real_Matrix;
 
-   function To_Matrix
-     (Source        : Vector;
-      Column_Vector : Boolean := True)
-      return          Matrix
-   is
-      Result : Matrix (1 .. 1, Source'Range);
-   begin
-      for Column in Source'Range loop
-         Result (1, Column) := Source (Column);
-      end loop;
-      if Column_Vector then
-         return MLR.Transpose (Result);
-      else
-         return Result;
-      end if;
-   end To_Matrix;
-
-   function To_Row_Vector
-     (Source : Matrix;
-      Column : Positive := 1)
-      return   Vector
-   is
-      Result : Vector (Source'Range (1));
-   begin
-      for Row in Result'Range loop
-         Result (Row) := Source (Row, Column);
-      end loop;
-      return Result;
-   end To_Row_Vector;
-
-   function Regression_Coefficients
-     (Source     : Vector;
-      Regressors : Matrix)
-      return       Vector
-   is
-      Result : Matrix (Regressors'Range (2), 1 .. 1);
-      Nil : Vector(1..0);
-   begin
-      if Source'Length /= Regressors'Length (1) then
-         raise Constraint_Error;
-      end if;
-      declare
-         Regressors_T : constant Matrix := MLR.Transpose (Regressors);
-         use MLR;
-      begin
-         Result := MLR.Inverse (Regressors_T * Regressors) *
-                   Regressors_T *
-                   To_Matrix (Source);
-      end;
-      return To_Row_Vector (Source => Result);
-   exception
-      when Constraint_Error => -- Singular
-         Text_IO.Put_Line("Singular result, converging?");
-         return Nil; -- Source;  -- Doesn't matter, will give a junk result
-   end Regression_Coefficients;
+   --  package MLR is new Ada.Numerics.Generic_Real_Arrays (Real => Long_Float);
+   --  subtype Vector is MLR.Real_Vector;
+   --  subtype Matrix is MLR.Real_Matrix;
+   --
+   --  function To_Matrix
+   --    (Source        : Vector;
+   --     Column_Vector : Boolean := True)
+   --     return          Matrix
+   --  is
+   --     Result : Matrix (1 .. 1, Source'Range);
+   --  begin
+   --     for Column in Source'Range loop
+   --        Result (1, Column) := Source (Column);
+   --     end loop;
+   --     if Column_Vector then
+   --        return MLR.Transpose (Result);
+   --     else
+   --        return Result;
+   --     end if;
+   --  end To_Matrix;
+   --
+   --  function To_Row_Vector
+   --    (Source : Matrix;
+   --     Column : Positive := 1)
+   --     return   Vector
+   --  is
+   --     Result : Vector (Source'Range (1));
+   --  begin
+   --     for Row in Result'Range loop
+   --        Result (Row) := Source (Row, Column);
+   --     end loop;
+   --     return Result;
+   --  end To_Row_Vector;
+   --
+   --  function Regression_Coefficients
+   --    (Source     : Vector;
+   --     Regressors : Matrix)
+   --     return       Vector
+   --  is
+   --     Result : Matrix (Regressors'Range (2), 1 .. 1);
+   --     Nil : Vector(1..0);
+   --  begin
+   --     if Source'Length /= Regressors'Length (1) then
+   --        raise Constraint_Error;
+   --     end if;
+   --     declare
+   --        Regressors_T : constant Matrix := MLR.Transpose (Regressors);
+   --        use MLR;
+   --     begin
+   --        Result := MLR.Inverse (Regressors_T * Regressors) *
+   --                  Regressors_T *
+   --                  To_Matrix (Source);
+   --     end;
+   --     return To_Row_Vector (Source => Result);
+   --  exception
+   --     when Constraint_Error => -- Singular
+   --        Text_IO.Put_Line("Singular result, converging?");
+   --        return Nil; -- Source;  -- Doesn't matter, will give a junk result
+   --  end Regression_Coefficients;
 
    -- Map task threads to multicore processors if available
    task type Thread(CPU : System.Task_Info.CPU_Number;
@@ -257,7 +258,6 @@ package body GEM.LTE.Primitives.Solution is
       Spread_Cycle : constant Long_Float := GEM.Getenv("SPREAD_CYCLE", 1000.0);
       Catchup : constant Boolean := GEM.Getenv("THRESHOLD_ACTION", "RESTART") = "CATCHUP";
       RMS_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "RMS";
-      Min_Entropy : constant Boolean := GEM.Getenv("METRIC", "CC") = "ME";
       Sin_Impulse : constant Boolean := GEM.Getenv("IMPULSE", "DELTA") = "SIN";
       Sampling_Per_Year : constant Long_Float := GEM.Getenv("SAMPLING", 12.0);
       Filter : constant Long_Float := GEM.Getenv("FILTER", 0.33333333);
@@ -270,7 +270,7 @@ package body GEM.LTE.Primitives.Solution is
       begin
          if RMS_Metric then
             return (RMS(X,Y,RMS_Data, 0.0) + CC(X,Y))/2.0;
-         elsif Min_Entropy then
+         elsif Is_Minimum_Entropy then
             return Min_Entropy_Power_Spectrum(X,Y);
          else
             return CC(X,Y);
@@ -374,10 +374,10 @@ package body GEM.LTE.Primitives.Solution is
       for Set'Address use D.B.Offset'Address; -- This may require Ada rec rep clauses
       ------------------------------------------------------------------------
 
-      RData : Vector (1 .. Last-First+1);
+      -- RData : Vector (1 .. Last-First+1);
       NM : Integer := GEM.Getenv("NM", N_Modulations);
-      Num_Coefficients : constant Integer := 2 + NM*2 + 1; -- !!! sin + cos mod
-      Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. Num_Coefficients);
+      -- Num_Coefficients : constant Integer := 2 + NM*2 + 1; -- !!! sin + cos mod
+      -- Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. Num_Coefficients);
       use Ada.Numerics.Long_Elementary_Functions;
       Pi : Long_Float := Ada.Numerics.Pi;
       Secular_Trend : Long_Float := 0.0;
@@ -385,8 +385,8 @@ package body GEM.LTE.Primitives.Solution is
       Impulse_Residual : Long_Float := GEM.Getenv("IR", 0.0);
    begin
       for I in First .. Last loop
-         RData (I-First+1) := Data_Records(I).Value;
-         Factors_Matrix (I-First+1, 1) := 1.0;  -- DC offset
+         -- RData (I-First+1) := Data_Records(I).Value;
+         -- Factors_Matrix (I-First+1, 1) := 1.0;  -- DC offset
          RMS_Data := RMS_Data + Data_Records(I).Value * Data_Records(I).Value;
       end loop;
       RMS_Data := Ada.Numerics.Long_Elementary_Functions.Sqrt(RMS_Data);
@@ -404,8 +404,8 @@ package body GEM.LTE.Primitives.Solution is
          der := 1.0 - D.B.mA - D.B.mP; -- keeps the integrator stable
          Impulses := Impulse_Amplify(
                             Raw     => Tide_Sum(Template     => Data_Records,
-                                                Constituents => D.B.LP,
-                                                Periods      => D.A.LPF,
+                                                Constituents => D.B.LPAP,
+                                                Periods      => D.A.LP,
                                                 Ref_Time     => Ref_Time + D.B.ShiftT,
                                                 Scaling      => Scaling,
                                                 Order2       => 0.0, --D.B.Order2,
@@ -422,41 +422,53 @@ package body GEM.LTE.Primitives.Solution is
             Forcing(I).Value := Forcing(I).Value + Impulse_Residual*Impulses(I).Value;
          end loop;
 
-         if not (Forcing_Only or Min_Entropy) then -- MLR_On
-            for I in First .. Last loop
-                Factors_Matrix(I-First+1, 2) := Forcing(I).Value;
-                for K in D.B.LT'First .. NM loop  -- D.B.LT'First = 1
-                    Factors_Matrix(I-First+1, 3+(K-1)*2) := Sin(2.0*Pi*D.B.LT(K) * Forcing(I).Value);
-                    Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(2.0*Pi*D.B.LT(K) * Forcing(I).Value);
-                end loop;
-                --!
-                --Factors_Matrix(I-First+1, Num_Coefficients-1) := Impulses(I).Value;
-                Factors_Matrix(I-First+1, Num_Coefficients) := Forcing(I).Date;
-            end loop;
+         if not (Forcing_Only or Is_Minimum_Entropy) then -- MLR_On
+              Regression_Factors (Data_Records => Data_Records, -- Time series
+                                   First => First,
+                                   Last => Last,  -- Training Interval
+                                   Forcing => Forcing,  -- Value @ Time
+                                   NM => NM, -- # modulations
+                                   --Factors_Matrix =>  Factors_Matrix,
+                                   DBLT => D.B.LT,
+                                   DALTAP => D.A.LTAP,
+                                   DALEVEL => D.A.LEVEL,
+                                   DAK0 => D.A.K0,
+                                   Secular_Trend => Secular_Trend);
 
-            declare
-               Coefficients : constant Vector := -- MLR.
-                              Regression_Coefficients
-                                 (Source     => RData,
-                                  Regressors => Factors_Matrix);
-               K : Integer := 4;
-            begin
-               if Coefficients'Length /= 0 then
-                  D.A.Level := Coefficients(1);
-                  D.A.K0 := Coefficients(2);
-                  for I in 1 .. NM loop  -- if odd
-                     D.A.LTAP(K/2-1).Amplitude := Sqrt(Coefficients(K-1)*Coefficients(K-1) + Coefficients(K)*Coefficients(K));
-                     D.A.LTAP(K/2-1).Phase := Arctan(Coefficients(K), Coefficients(K-1));
-                     K := K+2;
-                  end loop;
-                  --!
-                  --Impulse_Residual := Coefficients(Num_Coefficients-1); --!!!
-                  Secular_Trend := Coefficients(Num_Coefficients); --!!!
-               end if;
-            end;
+         --     for I in First .. Last loop
+         --         Factors_Matrix(I-First+1, 2) := Forcing(I).Value;
+         --         for K in D.B.LT'First .. NM loop  -- D.B.LT'First = 1
+         --             Factors_Matrix(I-First+1, 3+(K-1)*2) := Sin(2.0*Pi*D.B.LT(K) * Forcing(I).Value);
+         --             Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(2.0*Pi*D.B.LT(K) * Forcing(I).Value);
+         --         end loop;
+         --         --!
+         --         --Factors_Matrix(I-First+1, Num_Coefficients-1) := Impulses(I).Value;
+         --         Factors_Matrix(I-First+1, Num_Coefficients) := Forcing(I).Date;
+         --     end loop;
+         --
+         --     declare
+         --        Coefficients : constant Vector := -- MLR.
+         --                       Regression_Coefficients
+         --                          (Source     => RData,
+         --                           Regressors => Factors_Matrix);
+         --        K : Integer := 4;
+         --     begin
+         --        if Coefficients'Length /= 0 then
+         --           D.A.Level := Coefficients(1);
+         --           D.A.K0 := Coefficients(2);
+         --           for I in 1 .. NM loop  -- if odd
+         --              D.A.LTAP(K/2-1).Amplitude := Sqrt(Coefficients(K-1)*Coefficients(K-1) + Coefficients(K)*Coefficients(K));
+         --              D.A.LTAP(K/2-1).Phase := Arctan(Coefficients(K), Coefficients(K-1));
+         --              K := K+2;
+         --           end loop;
+         --           --!
+         --           --Impulse_Residual := Coefficients(Num_Coefficients-1); --!!!
+         --           Secular_Trend := Coefficients(Num_Coefficients); --!!!
+         --        end if;
+         --     end;
          end if;
 
-         if Forcing_Only or Min_Entropy then
+         if Forcing_Only or Is_Minimum_Entropy then
             Model := Forcing;
          else
             -- Forcing := Median(Forcing);
@@ -546,6 +558,8 @@ package body GEM.LTE.Primitives.Solution is
       end loop;
       Monitor.Stop;
       if Best_Client = ID then
+
+
          GEM.LTE.Primitives.Shared.Save(DKeep);
          -- Walker.Dump(Keep); -- Print results of last best evaluation,
          Ada.Long_Float_Text_IO.Put(D.B.Offset, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :offset:");
@@ -568,16 +582,24 @@ package body GEM.LTE.Primitives.Solution is
             Text_IO.New_Line;
          end loop;
          Text_IO.Put_Line("---- Tidal");
-         for I in D.B.LP'Range loop
-            Ada.Long_Float_Text_IO.Put(D.A.LPF(I), Fore=>4, Aft=>11, Exp=>0);
+         for I in D.B.LPAP'Range loop
+            Ada.Long_Float_Text_IO.Put(D.A.LP(I), Fore=>4, Aft=>11, Exp=>0);
             Text_IO.Put(", ");
-            Ada.Long_Float_Text_IO.Put(D.B.LP(I).Amplitude, Fore=>4, Aft=>11, Exp=>0);
+            Ada.Long_Float_Text_IO.Put(D.B.LPAP(I).Amplitude, Fore=>4, Aft=>11, Exp=>0);
             Text_IO.Put(", ");
-            Ada.Long_Float_Text_IO.Put(D.B.LP(I).Phase, Fore=>4, Aft=>11, Exp=>0);
+            Ada.Long_Float_Text_IO.Put(D.B.LPAP(I).Phase, Fore=>4, Aft=>11, Exp=>0);
             Text_IO.New_Line;
          end loop;
          Ada.Long_Float_Text_IO.Put(Impulse_Residual, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :ir:");
 
+         if Is_Minimum_Entropy then
+            Forcing := LTE(Forcing => Forcing,
+                         Wave_Numbers => D.B.Lt(1..NM),
+                         Amp_Phase => D.A.LTAP,
+                         Offset => D.A.level,
+                         K0 => D.A.K0,
+                         Trend => Secular_Trend);
+         end if;
          Save(KeepModel, Data_Records, Forcing);    -- Should also save to file
          if Split_Training then
             Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);

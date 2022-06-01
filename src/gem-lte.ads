@@ -7,7 +7,7 @@ package GEM.LTE is
 
    -- The year value is close to the Tropical year of 365.24219 days
    -- which accumulates to ~1/2 day error over 100 years
-   Year : constant Long_Float := 365.2412384; -- 365.246462;
+   -- Year : constant Long_Float := 365.2412384; -- 365.246462;
    Draconic : constant Long_Float := 27.21222082;
    Tropical : constant Long_Float := 27.32163237; -- 27.32166155;
    Anomalistic : constant Long_Float := 27.55454988;
@@ -61,31 +61,26 @@ package GEM.LTE is
        (0, 2, 0, 0, 0.0),
        (1, 0, 0, 0, 0.0),
        (1, 0, 0, 1, 0.0),
-       (2, 0,-2, 1, 0.0)
+       (2, 0,0, 1, 0.0)
 
  );
 
-
-
-   type Long_Period is
+   type Amp_Phase is
       record
          Amplitude, Phase : Long_Float;
       end record;
    subtype Period is Long_Float;
 
-   type Long_Periods is array (Positive range <>) of Long_Period;
-   type Long_Periods_Frequency is array (Positive range <>) of Period;
+   type Amp_Phases is array (Positive range <>) of Amp_Phase;
+   type Periods is array (Positive range <>) of Period;
 
-   type Harmonics is array (Positive range <>) of Long_Float;
+   -- Tidal Factor types
+   subtype Long_Periods_Amp_Phase is Amp_Phases;
+   subtype Long_Periods is Periods;
 
-   type Modulation is
-      record
-         Amplitude, Phase : Long_Float;
-      end record;
-   subtype Wavenumber is Long_Float;
-
-   type Modulations is array (Integer range <>) of Wavenumber;
-   type Modulations_Amp_Phase is array (Integer range <>) of Modulation;
+   -- LTE modulation types
+   subtype Modulations_Amp_Phase is Amp_Phases;
+   subtype Modulations is Periods;
 
    -- Default values that produce a fit to NINO34 of cc = ~0.83
    -- The period values can be derived from the constants above
@@ -124,11 +119,11 @@ package GEM.LTE is
    --  MTDD : constant := 1.0/(1.0/Mf+2.0/Nodical);
    --
 
+   LPAP : Long_Periods_Amp_Phase (Doodson_Args'Range);
    LP : Long_Periods (Doodson_Args'Range);
-   LPF : Long_Periods_Frequency (Doodson_Args'Range);
 
+   QBOAP : Long_Periods_Amp_Phase (QBO_Args'Range);
    QBO : Long_Periods (QBO_Args'Range);
-   QBOF : Long_Periods_Frequency (QBO_Args'Range);
 
 
    LTM : constant Modulations := (
@@ -157,18 +152,6 @@ package GEM.LTE is
      (0.0, 0.0),
      (0.0, 0.0),
      (0.0, 0.0));
-   --   (4.782646953,	-1.531748603),
-   --  ( 4.206881588,	-5.741140747),
-   --  ( 3.581731279,	-4.376886727),
-   --  (0.01,	1.0),
-   --  (0.01,	1.0),
-   --  (0.01,	1.0),
-   --  (0.01,	1.0),
-   --  (0.01,	1.0),
-   --  (0.01,	1.0),
-   --  (0.01,	1.0),
-   --  (0.01,	1.0)
-   --                                );
 
 
    LT0 :  Modulations (1..0);
@@ -187,19 +170,7 @@ package GEM.LTE is
 648.4298787,
 5161.28896 );
 
-   LTAP_NINO34 : constant Modulations_Amp_Phase := (
-(0.153249734	,	1.740430381),
-(0.096147614	,	1.377232535),
-(0.200301197	,	-0.435775052),
-(0.099510785	,	-2.027516506),
-(0.111454193	,	0.109971307),
-(-0.18224337   ,	0.562560365),
-(-0.407984091	,	0.929897973),
-(0.132155984	,	4.712143396),
-(0.058143978	,	3.2642847),
-(-0.234278036	,	0.054185875),
-(0.29980264	,	3.641119323)
-                                                   );
+   LTAP_NINO34 : constant Modulations_Amp_Phase := LTAP;
 
    LTM_IOD : constant Modulations := (
    10.47794403,
