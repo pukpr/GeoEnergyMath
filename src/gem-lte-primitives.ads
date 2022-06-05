@@ -53,6 +53,9 @@ package GEM.LTE.Primitives is
    -- This uses a float comparison and is really only used for tidal periods
    function Is_Fixed (Value : in Long_Float) return Boolean;
 
+   type Ns is array(Positive range <> ) of Positive;
+   function S_to_I (S : in string) return Ns;
+
 
    procedure Regression_Factors (Data_Records : in Data_Pairs;  -- Time series
                                  First, Last,  -- Training Interval
@@ -63,7 +66,8 @@ package GEM.LTE.Primitives is
                                  DALTAP : out Amp_Phases;
                                  DALEVEL : out Long_Float;
                                  DAK0 : out Long_Float;
-                                 Secular_Trend : out Long_Float);
+                                 Secular_Trend : out Long_Float;
+                                 Singular : out Boolean);
 
    --
    -- Utility procedures
@@ -98,5 +102,10 @@ package GEM.LTE.Primitives is
    -- rectangular window of width = 2*Lobe_Width+1
    function Window (Raw : in Data_Pairs;
                     Lobe_Width : in Positive) return Data_Pairs;
+
+   NL : constant Boolean := True;
+   procedure Put (Value : in Long_Float;
+                  Text : in String := "";
+                  New_Line : in Boolean := False);
 
 end GEM.LTE.Primitives;

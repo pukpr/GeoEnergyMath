@@ -12,6 +12,9 @@ with Ada.Numerics.Generic_Real_Arrays;
 
 package body GEM.LTE.Primitives.Solution is
 
+   Is_Split : constant Boolean := GEM.Getenv("SPLIT_TRAINING", FALSE);
+   Split_Low : constant Boolean := GEM.Getenv("SPLIT_LOW", TRUE);
+
    -- Multiple Linear Regression types
 --G   package MLR is new Gem.Matrices (
 --G      Element_Type => Long_Float,
@@ -266,12 +269,14 @@ package body GEM.LTE.Primitives.Solution is
       Calibrate : constant Boolean :=  GEM.Getenv("CAL", FALSE);
       RMS_Data : Long_Float := 0.0;
 
-      function Metric (X, Y : in Data_Pairs) return Long_Float is
+      function Metric (X, Y, Z : in Data_Pairs) return Long_Float is
       begin
          if RMS_Metric then
             return (RMS(X,Y,RMS_Data, 0.0) + CC(X,Y))/2.0;
+         elsif MLR_On then
+            return CC(X,Y) * Min_Entropy_Power_Spectrum(Z,Y);
          elsif Is_Minimum_Entropy then
-            return Min_Entropy_Power_Spectrum(X,Y);
+            return Min_Entropy_Power_Spectrum(X,Y); -- or X = Z
          else
             return CC(X,Y);
          end if;
@@ -374,16 +379,28 @@ package body GEM.LTE.Primitives.Solution is
       for Set'Address use D.B.Offset'Address; -- This may require Ada rec rep clauses
       ------------------------------------------------------------------------
 
-      -- RData : Vector (1 .. Last-First+1);
       NM : Integer := GEM.Getenv("NM", N_Modulations);
-      -- Num_Coefficients : constant Integer := 2 + NM*2 + 1; -- !!! sin + cos mod
-      -- Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. Num_Coefficients);
+      Harms : NS := S_To_I (GEM.Getenv("NH", "")); --  (2,7, 3,14,5, 6, 8, 9, 10, 11, 18, 16, 34, 68);
+      -- Harms : NS := (2,7, 3,14);
+      Test_Harms : NS := S_To_I (GEM.Getenv("NH", ""));
+      NH : Integer := Harms'Length; -- GEM.Getenv("NH", 0); -- Number of harmonics of the last modulation
       use Ada.Numerics.Long_Elementary_Functions;
       Pi : Long_Float := Ada.Numerics.Pi;
       Secular_Trend : Long_Float := 0.0;
       --!
       Impulse_Residual : Long_Float := GEM.Getenv("IR", 0.0);
+      Singular : Boolean;
+      M : Modulations(1 .. NM + NH );
+      MAP : Modulations_Amp_Phase (1 .. NM + NH);
    begin
+      --  if Harms = Test_Harms then
+      --     Text_IO.Put_Line("HARMS PASSED" & Test_Harms'Length'Img);
+      --  else
+      --     Text_IO.Put_Line("HARMS FAILED"  & Test_Harms'Length'Img);
+      --  end if;
+      --  for I in Test_Harms'Range loop
+      --     Text_IO.Put_Line("!HARMS"  & Test_Harms(I)'Img);
+      --  end loop;
       for I in First .. Last loop
          -- RData (I-First+1) := Data_Records(I).Value;
          -- Factors_Matrix (I-First+1, 1) := 1.0;  -- DC offset
@@ -422,82 +439,56 @@ package body GEM.LTE.Primitives.Solution is
             Forcing(I).Value := Forcing(I).Value + Impulse_Residual*Impulses(I).Value;
          end loop;
 
-         if not (Forcing_Only or Is_Minimum_Entropy) then -- MLR_On
+         M(1..NM) := D.B.LT(1..NM);
+         MAP(1..NM) := D.A.LTAP(1..NM);
+         for I in 1 .. NH loop
+            M(NM+I) := LONG_FLOAT(Harms(I)) * M(NM);
+         end loop;
+         if MLR_On or not (Forcing_Only or Is_Minimum_Entropy) then -- MLR_On
               Regression_Factors (Data_Records => Data_Records, -- Time series
-                                   First => First,
-                                   Last => Last,  -- Training Interval
-                                   Forcing => Forcing,  -- Value @ Time
-                                   NM => NM, -- # modulations
-                                   --Factors_Matrix =>  Factors_Matrix,
-                                   DBLT => D.B.LT,
-                                   DALTAP => D.A.LTAP,
-                                   DALEVEL => D.A.LEVEL,
-                                   DAK0 => D.A.K0,
-                                   Secular_Trend => Secular_Trend);
+                                  First => First,
+                                  Last => Last,  -- Training Interval
+                                  Forcing => Forcing,  -- Value @ Time
+                                  NM => NM + NH, -- # modulations
+                                  DBLT => M, --D.B.LT,
+                                  DALTAP => MAP, --D.A.LTAP,
+                                  DALEVEL => D.A.LEVEL,
+                                  DAK0 => D.A.K0,
+                                  Secular_Trend => Secular_Trend,
+                                  Singular => Singular
+                                 );
 
-         --     for I in First .. Last loop
-         --         Factors_Matrix(I-First+1, 2) := Forcing(I).Value;
-         --         for K in D.B.LT'First .. NM loop  -- D.B.LT'First = 1
-         --             Factors_Matrix(I-First+1, 3+(K-1)*2) := Sin(2.0*Pi*D.B.LT(K) * Forcing(I).Value);
-         --             Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(2.0*Pi*D.B.LT(K) * Forcing(I).Value);
-         --         end loop;
-         --         --!
-         --         --Factors_Matrix(I-First+1, Num_Coefficients-1) := Impulses(I).Value;
-         --         Factors_Matrix(I-First+1, Num_Coefficients) := Forcing(I).Date;
-         --     end loop;
-         --
-         --     declare
-         --        Coefficients : constant Vector := -- MLR.
-         --                       Regression_Coefficients
-         --                          (Source     => RData,
-         --                           Regressors => Factors_Matrix);
-         --        K : Integer := 4;
-         --     begin
-         --        if Coefficients'Length /= 0 then
-         --           D.A.Level := Coefficients(1);
-         --           D.A.K0 := Coefficients(2);
-         --           for I in 1 .. NM loop  -- if odd
-         --              D.A.LTAP(K/2-1).Amplitude := Sqrt(Coefficients(K-1)*Coefficients(K-1) + Coefficients(K)*Coefficients(K));
-         --              D.A.LTAP(K/2-1).Phase := Arctan(Coefficients(K), Coefficients(K-1));
-         --              K := K+2;
-         --           end loop;
-         --           --!
-         --           --Impulse_Residual := Coefficients(Num_Coefficients-1); --!!!
-         --           Secular_Trend := Coefficients(Num_Coefficients); --!!!
-         --        end if;
-         --     end;
          end if;
 
-         if Forcing_Only or Is_Minimum_Entropy then
+         if Forcing_Only or (Is_Minimum_Entropy and not MLR_On ) then
             Model := Forcing;
          else
             -- Forcing := Median(Forcing);
 
             Model := LTE(Forcing => Forcing,
-                         Wave_Numbers => D.B.Lt(1..NM),
-                         Amp_Phase => D.A.LTAP,
+                         Wave_Numbers => M, --D.B.Lt(1..NM),
+                         Amp_Phase => MAP, --D.A.LTAP,
                          Offset => D.A.level,
                          K0 => D.A.K0,
                          Trend => Secular_Trend);  -- D.LT GEM.LTE.LT0
 
             -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
             Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
-            --Model := Window(Window(Model, 5),5);
-            --Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
-            --Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
-            --Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
-            --Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
          end if;
 
-     --    end if;
 
          -- pragma Debug ( Dump(Model, Data_Records, Run_Time) );
 
          if Split_Training then
-            CorrCoeff := Metric( Model(First..Mid), Data_Records(First..Mid));
-            CorrCoeffTest := Metric( Model(Mid..Last), Data_Records(Mid..Last));
+            if Split_Low then
+               CorrCoeff := Metric( Model(First..Mid), Data_Records(First..Mid), Forcing(First..Mid));
+               CorrCoeffTest := Metric( Model(Mid..Last), Data_Records(Mid..Last), Forcing(Mid..Last));
+            else
+               CorrCoeffTest := Metric( Model(First..Mid), Data_Records(First..Mid), Forcing(First..Mid));
+               CorrCoeff := Metric( Model(Mid..Last), Data_Records(Mid..Last), Forcing(Mid..Last));
+            end if;
          else
-            CorrCoeff := Metric( Model(First..Last), Data_Records(First..Last));
+            CorrCoeff := Metric( Model(First..Last), Data_Records(First..Last), Forcing(First..Last));
          end if;
 
          -- Register the results with a monitor
@@ -527,7 +518,7 @@ package body GEM.LTE.Primitives.Solution is
             Set := Keep;
          end if;
 
-         if (not Best) and Counter > Maximum_Loops and Percentage < Threshold then
+         if Singular or ((not Best) and Counter > Maximum_Loops and Percentage < Threshold) then
             Text_IO.Put_Line("Resetting" & ID'Img & Percentage'Img & "%");
             if CatchUp then
                D := GEM.LTE.Primitives.Shared.Get(N_Tides, N_Modulations);
@@ -562,37 +553,31 @@ package body GEM.LTE.Primitives.Solution is
 
          GEM.LTE.Primitives.Shared.Save(DKeep);
          -- Walker.Dump(Keep); -- Print results of last best evaluation,
-         Ada.Long_Float_Text_IO.Put(D.B.Offset, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :offset:");
-         Ada.Long_Float_Text_IO.Put(D.B.Bg, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :bg:");
-         Ada.Long_Float_Text_IO.Put(D.B.ImpA, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :impA:");
-         Ada.Long_Float_Text_IO.Put(D.B.ImpB, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :impB:");
-         Ada.Long_Float_Text_IO.Put(D.B.mA, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :mA:");
-         Ada.Long_Float_Text_IO.Put(D.B.mP, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :mP:");
-         Ada.Long_Float_Text_IO.Put(D.B.shiftT, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :shiftT:");
-         Ada.Long_Float_Text_IO.Put(D.B.init, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :init:");
-         Text_IO.Put_Line("---- LTE");
-         Ada.Long_Float_Text_IO.Put(D.A.K0, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :K0:");
-         Ada.Long_Float_Text_IO.Put(D.A.Level, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :level:");
-         for I in D.B.LT'Range loop
-            Ada.Long_Float_Text_IO.Put(D.B.LT(I), Fore=>4, Aft=>11, Exp=>0);
-            Text_IO.Put(", ");
-            Ada.Long_Float_Text_IO.Put(D.A.LTAP (I).Amplitude, Fore=>4, Aft=>11, Exp=>0);
-            Text_IO.Put(", ");
-            Ada.Long_Float_Text_IO.Put(D.A.LTAP(I).Phase, Fore=>4, Aft=>11, Exp=>0);
-            Text_IO.New_Line;
-         end loop;
-         Text_IO.Put_Line("---- Tidal");
+         Put(D.B.Offset, " :offset:", NL);
+         Put(D.B.Bg,     " :bg:", NL);
+         Put(D.B.ImpA,   " :impA:", NL);
+         Put(D.B.ImpB,   " :impB:", NL);
+         Put(D.B.mA,     " :mA:", NL);
+         Put(D.B.mP,     " :mP:", NL);
+         Put(D.B.shiftT, " :shiftT:", NL);
+         Put(D.B.init,   " :init:", NL);
+         -- Put(Impulse_Residual, " :ir:", NL);
+         Text_IO.Put_Line("---- Tidal ----");
          for I in D.B.LPAP'Range loop
-            Ada.Long_Float_Text_IO.Put(D.A.LP(I), Fore=>4, Aft=>11, Exp=>0);
-            Text_IO.Put(", ");
-            Ada.Long_Float_Text_IO.Put(D.B.LPAP(I).Amplitude, Fore=>4, Aft=>11, Exp=>0);
-            Text_IO.Put(", ");
-            Ada.Long_Float_Text_IO.Put(D.B.LPAP(I).Phase, Fore=>4, Aft=>11, Exp=>0);
-            Text_IO.New_Line;
+            Put(D.A.LP(I), ", ");
+            Put(D.B.LPAP(I).Amplitude, ", ");
+            Put(D.B.LPAP(I).Phase, I'Img, NL);
          end loop;
-         Ada.Long_Float_Text_IO.Put(Impulse_Residual, Fore=>4, Aft=>11, Exp=>0); Text_IO.Put_Line(" :ir:");
+         Text_IO.Put_Line("---- LTE ----");
+         Put(D.A.K0,     " :K0:", NL);
+         Put(D.A.Level,  " :level:", NL);
+         for I in D.B.LT'First .. NM + NH loop
+            Put(M(I), ", ");  --D.B.LT
+            Put(MAP(I).Amplitude, ", "); --D.A.LTAP
+            Put(MAP(I).Phase, I'Img, NL);
+         end loop;
 
-         if Is_Minimum_Entropy then
+         if Is_Minimum_Entropy then --  and not MLR_On then
             Forcing := LTE(Forcing => Forcing,
                          Wave_Numbers => D.B.Lt(1..NM),
                          Amp_Phase => D.A.LTAP,
@@ -600,7 +585,7 @@ package body GEM.LTE.Primitives.Solution is
                          K0 => D.A.K0,
                          Trend => Secular_Trend);
          end if;
-         Save(KeepModel, Data_Records, Forcing);    -- Should also save to file
+         Save(KeepModel, Data_Records, Forcing);    -- saves to file
          if Split_Training then
             Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);
          else
@@ -618,6 +603,15 @@ package body GEM.LTE.Primitives.Solution is
          Text_IO.Put_Line (Gnat.Traceback.Symbolic.Symbolic_Traceback(E));
 
    end Dipole_Model;
+
+   function Check_Every_N_Loops return Integer is
+   begin
+      if Is_Split then
+         return 1;
+      else
+         return 100;
+      end if;
+   end Check_Every_N_Loops;
 
 
 end GEM.LTE.Primitives.Solution;

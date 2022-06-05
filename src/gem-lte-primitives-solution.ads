@@ -22,4 +22,6 @@ package GEM.LTE.Primitives.Solution is
    -- 3. Save resultant model to file, via climate index (time, value) pairs
    -- 4.
 
+   function Check_Every_N_Loops return Integer;
+
 end GEM.LTE.Primitives.Solution;

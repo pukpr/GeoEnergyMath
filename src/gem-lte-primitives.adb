@@ -1,12 +1,33 @@
-with Text_IO;
+with Ada.Integer_Text_IO;
 with Ada.Long_Float_Text_IO;
+with Text_IO;
 with Ada.Numerics.Long_Elementary_Functions;
 with Ada.Exceptions;
 with Ada.Numerics.Generic_Real_Arrays;
+--with GEM.Matrices;
 
 package body GEM.LTE.Primitives is
    Aliased_Period : constant Boolean := GEM.Getenv("ALIAS", FALSE);
    Min_Entropy : constant Boolean := GEM.Getenv("METRIC", "") = "ME";
+   Trend : constant Boolean := GEM.Getenv("TREND", TRUE);
+
+   -- String to list of integers
+   function S_to_I (S : in string) return Ns is
+     use Ada.Integer_Text_IO;
+     List : Ns(1..100);
+     N, L : Integer := 0;
+     Index : Integer := 1;
+   begin
+     loop
+        get(S(L+1..S'Last), N, L);
+        List(Index) := N;
+        Index := Index+1;
+     end loop;
+   exception
+     when others  =>
+        return List(1..Index-1);
+   end;
+
 
    function Is_Minimum_Entropy return Boolean is
    begin
@@ -273,7 +294,7 @@ package body GEM.LTE.Primitives is
    end RMS;
 
    Pi : constant Long_Float := Ada.Numerics.Pi;
-   Mult : constant Long_Float := 1.02;  --1.05
+   Mult : constant Long_Float := 1.012;  -- 1.02 --1.05
    F_Start : constant Long_Float := 1.0; --0.1
    F_End : constant Long_Float := 1000.0;
 
@@ -292,7 +313,7 @@ package body GEM.LTE.Primitives is
             C := C + Cos(2.0*Pi*F*X(I).Value)*Y(I).Value;
          end loop;
          Value := Value + (S*S + C*C);
-         Sum := Sum + Sqrt(S*S + C*C);
+         Sum := Sum + Sqrt((S*S + C*C));
          F := F*Mult;
          exit when F > F_End;
          N := N + 1;
@@ -318,7 +339,7 @@ package body GEM.LTE.Primitives is
          C := 0.0;
          SM := 0.0;
          CM := 0.0;
-         for I in Data'Range loop
+         for I in Data'First+8 .. Data'Last loop  -- remove Init value
             S := S + Sin(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
             C := C + Cos(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
             SM := SM + Sin(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
@@ -377,11 +398,16 @@ package body GEM.LTE.Primitives is
          Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
          if Is_Minimum_Entropy then
             ME_Power_Spectrum (Forcing=>Model, Model=>Forcing, Data=>Data,
-                            Model_Spectrum=>Model_S, Data_Spectrum=>Data_S);
+                               Model_Spectrum=>Model_S, Data_Spectrum=>Data_S);
+         else
+            ME_Power_Spectrum (Forcing=>Forcing, Model=>Model, Data=>Data,
+                               Model_Spectrum=>Model_S, Data_Spectrum=>Data_S);
          end if;
          for I in Data'Range loop
-            Text_IO.Put_Line(FT, Data_S(I).Date'Img & ", " & Model_S(I).Value'Img &
-                               ", " & Data_S(I).Value'Img & ", " & Forcing(I).Value'Img);
+            Text_IO.Put_Line(FT, Data(I).Date'Img & ", " & Model(I).Value'Img &
+                               ", " & Data(I).Value'Img & ", " & Forcing(I).Value'Img &
+                               ", " & Data_S(I).Date'Img & ", " & Model_S(I).Value'Img &
+                               ", " & Data_S(I).Value'Img );
          end loop;
          Text_IO.Close(FT);
       end Save;
@@ -435,10 +461,19 @@ package body GEM.LTE.Primitives is
 
 
    -- Regression procedures
+--   package MLR is new Gem.Matrices (
+--      Element_Type => Long_Float,
+--      Zero => 0.0,
+--      One => 1.0);
+--   subtype Vector is MLR.Vector;
+--   subtype Matrix is MLR.Matrix;
+
 
    package MLR is new Ada.Numerics.Generic_Real_Arrays (Real => Long_Float);
    subtype Vector is MLR.Real_Vector;
    subtype Matrix is MLR.Real_Matrix;
+
+   -- Multiple Linear Regression types
 
    function To_Matrix
      (Source        : Vector;
@@ -506,43 +541,65 @@ package body GEM.LTE.Primitives is
                                  DALTAP : out Amp_Phases;
                                  DALEVEL : out Long_Float;
                                  DAK0 : out Long_Float;
-                                 Secular_Trend : out Long_Float) is
+                                 Secular_Trend : out Long_Float;
+                                 Singular : out Boolean) is
 
       use Ada.Numerics.Long_Elementary_Functions;
       Pi : Long_Float := Ada.Numerics.Pi;
-      Num_Coefficients : constant Integer := 2 + NM*2 + 1; -- !!! sin + cos mod
+      Add_Trend : Integer := Boolean'Pos(Trend);
+      Num_Coefficients : constant Integer := 2 + NM*2 + Add_Trend; -- !!! sin + cos mod
       RData : Vector (1 .. Last-First+1);
       Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. Num_Coefficients);
    begin
-         for I in First .. Last loop
-             RData(I-First+1) := Data_Records(I).Value;
-             Factors_Matrix(I-First+1, 1) := 1.0;  -- DC offset
-             Factors_Matrix(I-First+1, 2) := Forcing(I).Value;
-             for K in DBLT'First .. NM loop  -- D.B.LT'First = 1
-                 Factors_Matrix(I-First+1, 3+(K-1)*2) := Sin(2.0*Pi*DBLT(K) * Forcing(I).Value);
-                 Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(2.0*Pi*DBLT(K) * Forcing(I).Value);
-             end loop;
-             Factors_Matrix(I-First+1, Num_Coefficients) := Forcing(I).Date;
+      for I in First .. Last loop
+         RData(I-First+1) := Data_Records(I).Value;
+         Factors_Matrix(I-First+1, 1) := 1.0;  -- DC offset
+         Factors_Matrix(I-First+1, 2) := Forcing(I).Value;
+         for K in DBLT'First .. NM loop  -- D.B.LT'First = 1
+            Factors_Matrix(I-First+1, 3+(K-1)*2) := Sin(2.0*Pi*DBLT(K) * Forcing(I).Value);
+            Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(2.0*Pi*DBLT(K) * Forcing(I).Value);
          end loop;
+         if Trend then
+            Factors_Matrix(I-First+1, Num_Coefficients) := Forcing(I).Date;
+         end if;
+      end loop;
 
-         declare
-            Coefficients : constant Vector :=
-                           Regression_Coefficients
-                              (Source     => RData,
-                               Regressors => Factors_Matrix);
-            K : Integer := 4;
-         begin
-            if Coefficients'Length /= 0 then
-               DALevel := Coefficients(1);
-               DAK0 := Coefficients(2);
-               for I in 1 .. NM loop  -- if odd
-                  DALTAP(K/2-1).Amplitude := Sqrt(Coefficients(K-1)*Coefficients(K-1) + Coefficients(K)*Coefficients(K));
-                  DALTAP(K/2-1).Phase := Arctan(Coefficients(K), Coefficients(K-1));
-                  K := K+2;
-               end loop;
+      declare
+         Coefficients : constant Vector := -- MLR.
+                        Regression_Coefficients
+                           (Source     => RData,
+                            Regressors => Factors_Matrix);
+         K : Integer := 4;
+      begin
+         if Coefficients'Length = 0 then
+            Singular := True;
+         else
+            DALevel := Coefficients(1);
+            DAK0 := Coefficients(2);
+            for I in 1 .. NM loop  -- if odd
+               DALTAP(K/2-1).Amplitude := Sqrt(Coefficients(K-1)*Coefficients(K-1) + Coefficients(K)*Coefficients(K));
+               DALTAP(K/2-1).Phase := Arctan(Coefficients(K), Coefficients(K-1));
+               K := K+2;
+            end loop;
+            if Trend then
                Secular_Trend := Coefficients(Num_Coefficients); --!!!
+            else
+               Secular_Trend := 0.0;
             end if;
-         end;
+            Singular := False;
+         end if;
+      end;
    end Regression_Factors;
+
+   procedure Put (Value : in Long_Float;
+                  Text : in String := "";
+                  New_Line : in Boolean := False) is
+   begin
+      Ada.Long_Float_Text_IO.Put(Value, Fore=>4, Aft=>11, Exp=>0);
+      Text_IO.Put(Text);
+      if New_Line then
+         Text_IO.New_Line;
+      end if;
+   end Put;
 
 end GEM.LTE.Primitives;
