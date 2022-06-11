@@ -281,4 +281,34 @@ package body Gem.Ephemeris is
 
    end MOONPOS;
 
+   procedure JULDAT(Y,M,D : in Integer;
+                    H : in Long_Float;
+                    TJD : out Long_Float) is
+
+      -- calculates Julian date for the given calendar date and time.
+      -- input calendar date : GREGORIAN
+      -- output : Julian date
+      -- (after Fliegel & Van Flandern)
+
+      JD : Long_Float;
+      -- Y : year
+      -- M : month number
+      -- D : day of month
+      -- H : Greenwich hours
+      -- JD : Julian day number for day beginning at GREENWICH noon
+      -- on the given date
+      -- TJD = Julian date (output)
+   begin
+
+      JD := Long_Float(D)-32075.0+1461.0*(Long_Float(Y)+4800.0+(Long_Float(M)-14.0)/12.0)/4.0
+        +367.0*(Long_Float(M)-2.0-(Long_Float(M)-14.0)/12.0*12.0)/12.0
+        -3.0*((Long_Float(Y)+4900.0+(Long_Float(M)-14.0)/12.0)/100.0)/4.0;
+
+      -- JD = D-32075+1461*(Y+4800+(M-14)/12)/4+367*(M-2-(M-14)/12*12)/12
+      -- . -3*((Y+4900+(M-14)/12)/100)/4
+
+      TJD := JD - 0.50 + H/24.0;
+
+   end JULDAT;
+
 end Gem.Ephemeris;

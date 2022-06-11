@@ -3,6 +3,7 @@ with System.Task_Info;
 with GEM.LTE.Primitives.Solution;
 with GEM.LTE.Primitives.Shared;
 with Text_IO;
+with GEM.dLOD;
 
 procedure ENSO_Opt is
    N :  Positive := System.Task_Info.Number_Of_Processors;
@@ -34,27 +35,34 @@ procedure ENSO_Opt is
          init   => 0.0063)
         );
 
+   -- Ref : GEM.LTE.Long_Periods_Amp_Phase := GEM.LTE.LPAP;
 begin
-   Text_IO.Put_Line(N'Img & " processors available");
-   GEM.LTE.Primitives.Shared.Load(D); -- if available
-   --D.B.Offset := -0.0000001;
-   --D.B.init := 0.1;
-   --D.B.ImpB := 0.0;
-   --D.B.LT(1) := 3.76;
-   --D.B.LT(2) := 3.94328550058;
-   --D.B.LT(3) := 12.6;
-   D.B.LT(1) := GEM.Getenv("LT1", D.B.LT(1));
-   --  D.B.LT(4) := D.B.LT(2)*3.0;
-   --  D.B.LT(5) := D.B.LT(2)*4.0;
-   --  D.B.LT(6) := D.B.LT(2)*5.0;
-   --D.B.LT(9) := 12.08;
-   --  D.B.LT(8) := D.B.LT(2)*7.0;
-   --  D.B.LT(9) := D.B.LT(2)*11.0;
-   --  D.B.LT(10) := D.B.LT(2)*22.0;
-   --  D.B.LT(11) := D.B.LT(2)*823.0/12.0;
-   --  --D.B.LP(9).Amplitude := 0.001;
-   --D.B.LT(1) := 0.1;
-   GEM.LTE.Primitives.Shared.Put(D);
+   declare
+      AP : Gem.LTE.Long_Periods_Amp_Phase  :=  GEM.dLOD("../dlod3.dat");
+   begin
+
+      Text_IO.Put_Line(N'Img & " processors available");
+      GEM.LTE.Primitives.Shared.Load(D); -- if available
+
+      if GEM.Getenv("DLOD_REF", TRUE) then
+         for I in D.B.LPAP'Range loop
+           GEM.LTE.LPRef(I).Amplitude := Ap(I).Amplitude;
+           GEM.LTE.LPRef(I).Phase := Ap(I).Phase;
+         end loop;
+      else -- update
+         for I in D.B.LPAP'Range loop
+           D.B.LPAP(I).Amplitude := Ap(I).Amplitude;
+           D.B.LPAP(I).Phase := Ap(I).Phase;
+         end loop;
+      end if;
+      D.B.LT(1) := GEM.Getenv("LT1", D.B.LT(1));
+      D.B.LT(2) := GEM.Getenv("LT2", D.B.LT(2));
+      D.B.LT(3) := GEM.Getenv("LT3", D.B.LT(3));
+      D.B.LT(4) := GEM.Getenv("LT4", D.B.LT(4));
+      GEM.LTE.Primitives.Shared.Put(D);
+
+   end;
+
    GEM.LTE.Primitives.Solution.Start(D.NLP,D.NLT,N);
 
 
@@ -78,6 +86,8 @@ begin
       exit when GEM.LTE.Primitives.Halted;
    end loop;
    Text_IO.Put_Line("Main exiting, flushing other tasks");
+
+
    delay 5.0;
 
-end ENSO_Opt;
+ end ENSO_Opt;

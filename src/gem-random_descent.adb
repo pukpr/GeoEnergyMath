@@ -13,8 +13,13 @@ package body GEM.Random_Descent is
    package DR is new Ada.Numerics.Discrete_Random(Set_Index);
    Flip_Value : constant Long_Float := GEM.Getenv("FLIP", 0.0);
 
+   subtype Harmonic_Index is Positive range 2..Harmonic_Range;
+   package HR is new Ada.Numerics.Discrete_Random(Harmonic_Index);
+
    D : DR.Generator; -- Discrete for selecting from a set of params
    G : FR.Generator; -- Floating point for values
+   H : HR.Generator; -- Floating point for values
+
 
    procedure Markov (Set : in out LF_Array;
                      Ref : out LF_Array;
@@ -67,10 +72,39 @@ package body GEM.Random_Descent is
       end loop;
    end Dump;
 
+   procedure Random_Harmonic(Index : in out Positive;
+                             Ref : out Positive) is
+      Ran : Long_Float := Long_Float(FR.Random(G));
+   begin
+      Ref := Index;
+      if Ran < Flip_Value then
+         Index := HR.Random(H);
+      end if;
+   end Random_Harmonic;
+
+   procedure Random_Harmonic(Index : in out NS;
+                             Ref : out NS) is
+      Test : Positive;
+      Reference : NS := Index;
+   begin
+      for I in Index'Range loop
+         Random_Harmonic (Index(I), Test);
+         for J in Reference'Range loop
+            -- Make sure no duplicates in Harmonics otherwise singularity in sol'n
+            if Index(I) = Reference(J) then
+               Index(I) := Test;  -- keep the old value
+               exit;
+            end if;
+         end loop;
+      end loop;
+      Ref := Reference;
+   end Random_Harmonic;
+
    procedure Reset is
    begin
       DR.Reset(D);
       FR.Reset(G);
+      HR.Reset(H);
    end;
 
 end GEM.Random_Descent;

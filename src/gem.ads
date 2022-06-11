@@ -13,4 +13,9 @@ package GEM is
    procedure Setenv (Name : in String; Value : in String);
    procedure Clear (Name : in String);
 
+   -- List of integers from "1 2 4 6" etc
+   type Ns is array(Positive range <> ) of Positive;
+   function S_to_I (S : in string) return Ns;
+
+
 end GEM;

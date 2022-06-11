@@ -27,8 +27,8 @@ package GEM.LTE is
    Doodson_Args : Doodson_List :=
      ( (3, 0,-1, 2, 0.0),
        (1,-1, 0, 0, 0.0),
-       (0, 0, 1,-1, 0.0),
-       (0, 0, 1, 1, 0.0),
+ --      (0, 0, 1,-1, 0.0),
+ --      (0, 0, 1, 1, 0.0),
        (1, 0, 1, 0, 0.0),
        (4, 0, 0, 1, 0.0),
        (4, 0,-2, 1, 0.0),
@@ -37,7 +37,7 @@ package GEM.LTE is
        (0, 0, 0, 2, 0.0),
        (3, 0,-1, 1, 0.0),
        (2, 0,-2, 0, 0.0),
-       (0, 0, 1, 0, 0.0),
+ --      (0, 0, 1, 0, 0.0),
        (0, 0, 0, 1, 0.0),
        (1, 0,-1, 0, 0.0),
        (1, 0,-1,-1, 0.0),
@@ -121,6 +121,8 @@ package GEM.LTE is
 
    LPAP : Long_Periods_Amp_Phase (Doodson_Args'Range);
    LP : Long_Periods (Doodson_Args'Range);
+
+   LPRef : Long_Periods_Amp_Phase (Doodson_Args'Range);
 
    QBOAP : Long_Periods_Amp_Phase (QBO_Args'Range);
    QBO : Long_Periods (QBO_Args'Range);

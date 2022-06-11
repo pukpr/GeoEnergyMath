@@ -11,23 +11,6 @@ package body GEM.LTE.Primitives is
    Min_Entropy : constant Boolean := GEM.Getenv("METRIC", "") = "ME";
    Trend : constant Boolean := GEM.Getenv("TREND", TRUE);
 
-   -- String to list of integers
-   function S_to_I (S : in string) return Ns is
-     use Ada.Integer_Text_IO;
-     List : Ns(1..100);
-     N, L : Integer := 0;
-     Index : Integer := 1;
-   begin
-     loop
-        get(S(L+1..S'Last), N, L);
-        List(Index) := N;
-        Index := Index+1;
-     end loop;
-   exception
-     when others  =>
-        return List(1..Index-1);
-   end;
-
 
    function Is_Minimum_Entropy return Boolean is
    begin
@@ -146,9 +129,10 @@ package body GEM.LTE.Primitives is
    function Tide_Sum (Template : in Data_Pairs;
                       Constituents : in Long_Periods_Amp_Phase;
                       Periods : in Long_Periods;
-                      Ref_Time : in Long_Float;
-                      Scaling : in Long_Float;
-                      Order2, Order3 : in Long_Float) return Data_Pairs is
+                      Ref_Time : in Long_Float := 0.0;
+                      Scaling : in Long_Float := 1.0;
+                      Cos_Phase : in Boolean := True
+                      ) return Data_Pairs is
       Pi : Long_Float := Ada.Numerics.Pi;
       Time : Long_Float;
       Res : Data_Pairs := Template;
@@ -171,10 +155,14 @@ package body GEM.LTE.Primitives is
                         Period := 1.0/(Year_Length/Period - Long_Float(INTEGER(Year_Length/Period)));
                      end if;
                   end if;
-                  TF := TF + L.Amplitude*Cos(2.0*Pi*Year_Length/Period*Time + L.Phase); --!
+                  if Cos_Phase then
+                     TF := TF + L.Amplitude*Cos(2.0*Pi*Year_Length/Period*Time + L.Phase);
+                  else
+                     TF := TF + L.Amplitude*Sin(2.0*Pi*Year_Length/Period*Time + L.Phase);
+                  end if;
                end;
             end loop;
-            Res(I) := (Time, Scaling * (TF + Order2*TF*TF + Order3*TF*TF*TF) );
+            Res(I) := (Time, Scaling * TF);
          end;
       end loop;
       return Res;
@@ -290,12 +278,13 @@ package body GEM.LTE.Primitives is
         sum_XY := sum_XY + (X(i).Value - Y(j).Value + Offset)**2;
         J := J + 1;
       end loop;
-      return 1.0 - sqrt(sum_XY)/Ref;
+      -- return 1.0 - sqrt(sum_XY)/Ref;
+      return 1.0/(1.0+sqrt(sum_XY)/Ref);
    end RMS;
 
    Pi : constant Long_Float := Ada.Numerics.Pi;
    Mult : constant Long_Float := 1.012;  -- 1.02 --1.05
-   F_Start : constant Long_Float := 1.0; --0.1
+   F_Start : constant Long_Float := 1.0; -- 0.01; --1.0
    F_End : constant Long_Float := 1000.0;
 
    function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float is
@@ -541,12 +530,13 @@ package body GEM.LTE.Primitives is
                                  DALTAP : out Amp_Phases;
                                  DALEVEL : out Long_Float;
                                  DAK0 : out Long_Float;
-                                 Secular_Trend : out Long_Float;
+                                 Secular_Trend : in out Long_Float;
                                  Singular : out Boolean) is
 
       use Ada.Numerics.Long_Elementary_Functions;
       Pi : Long_Float := Ada.Numerics.Pi;
-      Add_Trend : Integer := Boolean'Pos(Trend);
+      Add_Trend : Integer := Integer(Secular_Trend);
+      -- Add_Trend : Integer := Boolean'Pos(Trend);
       Num_Coefficients : constant Integer := 2 + NM*2 + Add_Trend; -- !!! sin + cos mod
       RData : Vector (1 .. Last-First+1);
       Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. Num_Coefficients);
@@ -601,5 +591,18 @@ package body GEM.LTE.Primitives is
          Text_IO.New_Line;
       end if;
    end Put;
+
+   function Filter9Point (Raw : in Data_Pairs) return  Data_Pairs is
+      Res : Data_Pairs := Raw;
+   begin
+      for I in Raw'First + 4 .. Raw'Last - 4 loop
+         Res(I).Value :=
+           1.0/9.0 * ( 0.25*(Raw(I-4).Value + Raw(I-3).Value + Raw(I-2).Value)+
+                       0.5*(Raw(I-1).Value + Raw(I).Value + Raw(I+1).Value)+
+                       0.25*(Raw(I+2).Value + Raw(I+3).Value + Raw(I+4).Value) );
+      end loop;
+      return Res;
+   end Filter9Point;
+
 
 end GEM.LTE.Primitives;

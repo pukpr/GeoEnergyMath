@@ -1,6 +1,8 @@
 with Ada.Environment_Variables;
 with Ada.Command_Line;
 with Text_IO;
+with Ada.Integer_Text_IO;
+
 package body GEM is
 
    --function Getenv (Name : in String; Default : in String) return String renames
@@ -49,5 +51,24 @@ package body GEM is
    begin
       Ada.Environment_Variables.Clear(Name);
    end Clear;
+
+   -- String to list of integers
+   function S_to_I (S : in string) return Ns is
+     use Ada.Integer_Text_IO;
+     List : Ns(1..100); -- magic number
+     N, L : Integer := 0;
+     Index : Integer := 1;
+   begin
+     loop
+        get(S(L+1..S'Last), N, L);
+        List(Index) := N;
+        Index := Index+1;
+     end loop;
+   exception
+     when others  =>
+        return List(1..Index-1);
+   end;
+
+
 
 end GEM;

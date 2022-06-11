@@ -2,6 +2,7 @@
 generic
    with function Fixed (Value : in Long_Float) return Boolean is <>;
    Set_Range : in Positive;
+   Harmonic_Range : in Positive;
 package GEM.Random_Descent is
 
    -- Instantiated with an array, i.e set of floats
@@ -21,6 +22,11 @@ package GEM.Random_Descent is
                      Spread : in Long_Float);
 
    procedure Dump(Set : in LF_Array);
+
+   procedure Random_Harmonic(Index : in out Positive;
+                             Ref : out Positive);
+   procedure Random_Harmonic(Index : in out Ns;
+                             Ref : out Ns);
 
    -- Random number generator reset, otherwise it will start from fixed seed
    procedure Reset;

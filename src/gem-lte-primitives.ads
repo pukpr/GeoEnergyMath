@@ -39,9 +39,10 @@ package GEM.LTE.Primitives is
    function Tide_Sum (Template : in Data_Pairs;
                       Constituents : in Long_Periods_Amp_Phase;
                       Periods : in Long_Periods;
-                      Ref_Time : in Long_Float; -- remove the millenial offset
-                      Scaling : in Long_Float;
-                      Order2, Order3 : in Long_Float) return Data_Pairs;
+                      Ref_Time : in Long_Float := 0.0;
+                      Scaling : in Long_Float := 1.0;
+                      Cos_Phase : in Boolean := True
+                      ) return Data_Pairs;
 
 
    function LTE (Forcing : in Data_Pairs;
@@ -53,9 +54,6 @@ package GEM.LTE.Primitives is
    -- This uses a float comparison and is really only used for tidal periods
    function Is_Fixed (Value : in Long_Float) return Boolean;
 
-   type Ns is array(Positive range <> ) of Positive;
-   function S_to_I (S : in string) return Ns;
-
 
    procedure Regression_Factors (Data_Records : in Data_Pairs;  -- Time series
                                  First, Last,  -- Training Interval
@@ -66,7 +64,7 @@ package GEM.LTE.Primitives is
                                  DALTAP : out Amp_Phases;
                                  DALEVEL : out Long_Float;
                                  DAK0 : out Long_Float;
-                                 Secular_Trend : out Long_Float;
+                                 Secular_Trend : in out Long_Float;
                                  Singular : out Boolean);
 
    --
@@ -107,5 +105,9 @@ package GEM.LTE.Primitives is
    procedure Put (Value : in Long_Float;
                   Text : in String := "";
                   New_Line : in Boolean := False);
+
+   -- 9 point centered filter
+   function Filter9Point (Raw : in Data_Pairs) return  Data_Pairs;
+
 
 end GEM.LTE.Primitives;
