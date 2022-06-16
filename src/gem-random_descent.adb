@@ -78,7 +78,12 @@ package body GEM.Random_Descent is
    begin
       Ref := Index;
       if Ran < Flip_Value then
-         Index := HR.Random(H);
+         if Ran < Flip_Value/2.0 then
+            Index := HR.Random(H);
+         else
+            Index := 2 - INTEGER(Long_Float(Harmonic_Range)
+                                 * LEF.Log(Long_Float(FR.Random(G))));
+         end if;
       end if;
    end Random_Harmonic;
 
@@ -106,5 +111,8 @@ package body GEM.Random_Descent is
       FR.Reset(G);
       HR.Reset(H);
    end;
-
+begin
+   if GEM.Getenv("RESET", FALSE) then
+      Reset;
+   end if;
 end GEM.Random_Descent;

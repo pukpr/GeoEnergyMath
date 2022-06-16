@@ -27,7 +27,7 @@ procedure ENSO_Opt is
          LT     => GEM.LTE.LTM,
          Offset => 0.0,
          bg     => 0.0,
-         ImpA   => 9.0,
+         ImpA   => 1.0, -- 9.0
          ImpB   => 0.0, ---9.0,
          mA     => 0.0,
          mP     => 0.0,
@@ -44,13 +44,17 @@ begin
       Text_IO.Put_Line(N'Img & " processors available");
       GEM.LTE.Primitives.Shared.Load(D); -- if available
 
-      if GEM.Getenv("DLOD_REF", TRUE) then
+      if GEM.Getenv("DLOD_REF", FALSE) then
+         Text_IO.Put_Line("Referencing dLOD");
          for I in D.B.LPAP'Range loop
            GEM.LTE.LPRef(I).Amplitude := Ap(I).Amplitude;
            GEM.LTE.LPRef(I).Phase := Ap(I).Phase;
          end loop;
       else -- update
+         Text_IO.Put_Line("Loading dLOD");
          for I in D.B.LPAP'Range loop
+           GEM.LTE.LPRef(I).Amplitude := Ap(I).Amplitude;
+           GEM.LTE.LPRef(I).Phase := Ap(I).Phase;
            D.B.LPAP(I).Amplitude := Ap(I).Amplitude;
            D.B.LPAP(I).Phase := Ap(I).Phase;
          end loop;
@@ -59,6 +63,15 @@ begin
       D.B.LT(2) := GEM.Getenv("LT2", D.B.LT(2));
       D.B.LT(3) := GEM.Getenv("LT3", D.B.LT(3));
       D.B.LT(4) := GEM.Getenv("LT4", D.B.LT(4));
+      D.B.Offset := GEM.Getenv("OFFSET", D.B.Offset);
+      D.B.bg := 0.0;
+      D.B.mA := 0.0;
+      D.B.shiftT := 0.0;
+      D.B.ImpA := GEM.Getenv("IMPaVALUE", D.B.ImpA);
+      D.B.ImpB := GEM.Getenv("IMPbVALUE", D.B.ImpB);
+      D.B.mP   := GEM.Getenv("MP",        D.B.mP);
+      D.B.Init := GEM.Getenv("INIT",      D.B.Init);
+
       GEM.LTE.Primitives.Shared.Put(D);
 
    end;

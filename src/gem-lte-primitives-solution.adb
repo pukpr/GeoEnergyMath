@@ -244,7 +244,7 @@ package body GEM.LTE.Primitives.Solution is
       ID : Integer;
       Name : String := GEM.Getenv(Name => "CLIMATE_INDEX",
                                   Default => "nino34_soi.txt");
-      Split : Boolean := not (GEM.Getenv(Name => "SPLIT_TRAINING",
+      Split : Boolean := not (GEM.Getenv(Name => "SPLIT_TRAINING",   --FIX
                                          Default => "") = "");
    begin
       Monitor.Client(ID);
@@ -304,9 +304,10 @@ package body GEM.LTE.Primitives.Solution is
       Sin_Impulse : constant Boolean := GEM.Getenv("IMPULSE", "DELTA") = "SIN";
       Sampling_Per_Year : constant Long_Float := GEM.Getenv("SAMPLING", 12.0);
       Filter : constant Long_Float := GEM.Getenv("FILTER", 0.33333333);
-      MLR_On : constant Boolean := GEM.Getenv("MLR", FALSE);
+      MLR_On : constant Boolean := GEM.Getenv("MLR", FALSE); -- wrong name
       Forcing_Only : constant Boolean := GEM.Getenv("FORCING", FALSE);
       Calibrate : constant Boolean :=  GEM.Getenv("CAL", FALSE);
+      Pareto : constant Boolean :=  GEM.Getenv("PARETO", FALSE);
       RMS_Data : Long_Float := 0.0;
 
       function Metric (X, Y, Z : in Data_Pairs) return Long_Float is
@@ -386,6 +387,7 @@ package body GEM.LTE.Primitives.Solution is
 
       der : Long_Float;
       CorrCoeff, Old_CC : Long_Float := 0.0;
+      CorrCoeffP : Long_Float;
       CorrCoeffTest, Old_CCTest : Long_Float := 0.0;
       Progress_Cycle, Spread : Long_Float;
       Counter : Long_Integer := -1;
@@ -439,6 +441,8 @@ package body GEM.LTE.Primitives.Solution is
       Singular : Boolean;
       M : Modulations(1 .. NM + NH );
       MAP : Modulations_Amp_Phase (1 .. NM + NH);
+      Pareto_Scale : Long_Float;
+      Pareto_Start : Positive;
    begin
       --  if Harms = Test_Harms then
       --     Text_IO.Put_Line("HARMS PASSED" & Test_Harms'Length'Img);
@@ -466,14 +470,20 @@ package body GEM.LTE.Primitives.Solution is
          -- Tidal constituents summed, amplified by impulse, and LTE modulated
 
          der := 1.0 - D.B.mA - D.B.mP; -- keeps the integrator stable
+
+         GEM.LTE.Year_Adjustment(D.B.Offset, D.A.LP);
+
          Impulses := Impulse_Amplify(
                             Raw     => Tide_Sum(Template     => Data_Records,
                                                 Constituents => D.B.LPAP,
                                                 Periods      => D.A.LP,
                                                 Ref_Time     => Ref_Time + D.B.ShiftT,
-                                                Scaling      => Scaling
+                                                Scaling      => Scaling,
+                                                Year_Len     => Year_Length
                                                ),
-                          Offset => D.B.Offset, Ramp => D.B.bg, Start => Data_Records(Data_Records'First).Date);
+                                     Offset => 0.0, -- D.B.Offset,
+                                     Ramp => 0.0, -- D.B.bg,
+                                     Start => Data_Records(Data_Records'First).Date);
 
          Forcing := IIR( Raw => Impulses,
                          lagA => der, lagB => D.B.mA, lagC => D.B.mP,
@@ -507,14 +517,23 @@ package body GEM.LTE.Primitives.Solution is
             Singular := False;
          end if;
 
+      CorrCoeff := 0.0;
+      Pareto_Scale := 0.0;
+      if Pareto then
+            Pareto_Start := 1;
+      else
+            Pareto_Start := NH+1;
+      end if;
+      for Pareto_Index in Pareto_Start .. NH+1 loop
+         Pareto_Scale := Pareto_Scale + 1.0/Long_Float(Pareto_Index);
          if Forcing_Only or (Is_Minimum_Entropy and not MLR_On ) then
             Model := Forcing;
          else
             -- Forcing := Median(Forcing);
 
             Model := LTE(Forcing => Forcing,
-                         Wave_Numbers => M, --D.B.Lt(1..NM),
-                         Amp_Phase => MAP, --D.A.LTAP,
+                         Wave_Numbers => M(1 .. NM - 1 + Pareto_Index), --D.B.Lt(1..NM),
+                         Amp_Phase => MAP(1 .. NM - 1 + Pareto_Index), --D.A.LTAP,
                          Offset => D.A.level,
                          K0 => D.A.K0,
                          Trend => Secular_Trend);  -- D.LT GEM.LTE.LT0
@@ -535,8 +554,14 @@ package body GEM.LTE.Primitives.Solution is
                CorrCoeff := Metric( Model(Mid..Last), Data_Records(Mid..Last), Forcing(Mid..Last));
             end if;
          else
-            CorrCoeff := Metric( Model(First..Last), Data_Records(First..Last), Forcing(First..Last));
+            CorrCoeffP := Metric( Model(First..Last), Data_Records(First..Last), Forcing(First..Last));
          end if;
+
+         CorrCoeff := CorrCoeffP/Long_Float(Pareto_Index) + CorrCoeff;
+         exit when not Pareto;
+      end loop;  -- Pareto
+
+         CorrCoeff := CorrCoeff/Pareto_Scale;
 
          -- Register the results with a monitor
          if Split_Training then

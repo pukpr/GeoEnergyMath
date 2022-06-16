@@ -41,7 +41,8 @@ package GEM.LTE.Primitives is
                       Periods : in Long_Periods;
                       Ref_Time : in Long_Float := 0.0;
                       Scaling : in Long_Float := 1.0;
-                      Cos_Phase : in Boolean := True
+                      Cos_Phase : in Boolean := True;
+                      Year_Len : in Long_Float := Year_Length
                       ) return Data_Pairs;
 
 

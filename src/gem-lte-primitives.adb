@@ -4,12 +4,14 @@ with Text_IO;
 with Ada.Numerics.Long_Elementary_Functions;
 with Ada.Exceptions;
 with Ada.Numerics.Generic_Real_Arrays;
+with Gnat.Os_Lib;
 --with GEM.Matrices;
 
 package body GEM.LTE.Primitives is
    Aliased_Period : constant Boolean := GEM.Getenv("ALIAS", FALSE);
    Min_Entropy : constant Boolean := GEM.Getenv("METRIC", "") = "ME";
-   Trend : constant Boolean := GEM.Getenv("TREND", TRUE);
+   -- Trend : constant Boolean := GEM.Getenv("TREND", TRUE);
+   Linear_Step : constant Boolean := GEM.Getenv("STEP", FALSE);
 
 
    function Is_Minimum_Entropy return Boolean is
@@ -58,6 +60,7 @@ package body GEM.LTE.Primitives is
    exception
       when E : Others =>
          Text_IO.Put_Line(Ada.Exceptions.Exception_Information(E));
+         Gnat.Os_Lib.Os_Exit(0);
          return Arr;
    end Make_Data;
 
@@ -131,7 +134,8 @@ package body GEM.LTE.Primitives is
                       Periods : in Long_Periods;
                       Ref_Time : in Long_Float := 0.0;
                       Scaling : in Long_Float := 1.0;
-                      Cos_Phase : in Boolean := True
+                      Cos_Phase : in Boolean := True;
+                      Year_Len : in Long_Float := Year_Length
                       ) return Data_Pairs is
       Pi : Long_Float := Ada.Numerics.Pi;
       Time : Long_Float;
@@ -149,16 +153,16 @@ package body GEM.LTE.Primitives is
                   Period : Long_Float := Periods(J);
                begin
                   if Aliased_Period then
-                     if Period >= Year_Length/3.01 then
+                     if Period >= Year_Len/3.01 then
                         Period := Period;
                      else
-                        Period := 1.0/(Year_Length/Period - Long_Float(INTEGER(Year_Length/Period)));
+                        Period := 1.0/(Year_Len/Period - Long_Float(INTEGER(Year_Len/Period)));
                      end if;
                   end if;
                   if Cos_Phase then
-                     TF := TF + L.Amplitude*Cos(2.0*Pi*Year_Length/Period*Time + L.Phase);
+                     TF := TF + L.Amplitude*Cos(2.0*Pi*Year_Len/Period*Time + L.Phase);
                   else
-                     TF := TF + L.Amplitude*Sin(2.0*Pi*Year_Length/Period*Time + L.Phase);
+                     TF := TF + L.Amplitude*Sin(2.0*Pi*Year_Len/Period*Time + L.Phase);
                   end if;
                end;
             end loop;
@@ -283,11 +287,12 @@ package body GEM.LTE.Primitives is
    end RMS;
 
    Pi : constant Long_Float := Ada.Numerics.Pi;
-   Mult : constant Long_Float := 1.012;  -- 1.02 --1.05
-   F_Start : constant Long_Float := 1.0; -- 0.01; --1.0
+   Mult : constant Long_Float := 1.003;  -- 1.006 1.012 1.02 --1.05
+   Step : constant Long_Float := 0.02;
+   F_Start : constant Long_Float := 0.3; -- 0.01; --1.0
    F_End : constant Long_Float := 1000.0;
 
-   function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float is
+   function Min_Entropy_RMS (X, Y : in Data_Pairs) return Long_Float is
       use Ada.Numerics.Long_Elementary_Functions;
       Value, Sum : Long_Float := 0.0;
       S, C : Long_Float; -- cumulative
@@ -303,7 +308,11 @@ package body GEM.LTE.Primitives is
          end loop;
          Value := Value + (S*S + C*C);
          Sum := Sum + Sqrt((S*S + C*C));
-         F := F*Mult;
+         if Linear_Step then
+            F := F + Step;
+         else
+            F := F*Mult;
+         end if;
          exit when F > F_End;
          N := N + 1;
       end loop;
@@ -311,38 +320,114 @@ package body GEM.LTE.Primitives is
       Value := (Value-Sum)/Sum;
       --Text_IO.Put_Line(Value'Img & Sum'Img);
       return Value;
-   end Min_Entropy_Power_Spectrum;
+   end Min_Entropy_RMS;
 
-   procedure ME_Power_Spectrum (Forcing, Model, Data : in Data_Pairs;
+
+   procedure LTE_Power_Spectrum (Forcing, Model, Data : in Data_Pairs;
                              Model_Spectrum, Data_Spectrum : out Data_Pairs) is
-      use Ada.Numerics.Long_Elementary_Functions;
-      Model_S : Data_Pairs(Model'Range);
-      Data_S : Data_Pairs(Model'Range);
-      Value, Sum : Long_Float := 0.0;
-      F : Long_Float := F_Start;
-      S, C, SM, CM : Long_Float; -- cumulative
-      N : Integer := 1;
+     use Ada.Numerics.Long_Elementary_Functions;
+     Model_S : Data_Pairs(Model'Range);
+     Data_S : Data_Pairs(Data'Range);
+     Value, Sum : Long_Float := 0.0;
+     F : Long_Float := F_Start;
+     S, C : Long_Float; -- cumulative
+     N : Integer := 1;
    begin
       for J in Data'Range loop
          S := 0.0;
          C := 0.0;
-         SM := 0.0;
-         CM := 0.0;
          for I in Data'First+8 .. Data'Last loop  -- remove Init value
             S := S + Sin(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
             C := C + Cos(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
-            SM := SM + Sin(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
-            CM := CM + Cos(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
          end loop;
          Data_S(J).Date := F;
          Data_S(J).Value := (S*S + C*C);
+         if Linear_Step then
+            F := F + Step;
+         else
+            F := F*Mult;
+         end if;
+      end loop;
+      F := F_Start;
+      for J in Model'Range loop
+         S := 0.0;
+         C := 0.0;
+         for I in Model'First+8 .. Model'Last loop  -- remove Init value
+            S := S + Sin(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
+            C := C + Cos(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
+         end loop;
          Model_S(J).Date := F;
-         Model_S(J).Value := (SM*SM + CM*CM);
-         F := F*Mult;
+         Model_S(J).Value := (S*S + C*C);
+         if Linear_Step then
+            F := F + Step;
+         else
+            F := F*Mult;
+         end if;
+      end loop;
+      Model_Spectrum := Model_S;
+      Data_Spectrum := Data_S;
+   end LTE_Power_Spectrum;
+
+   procedure ME_Power_Spectrum (Forcing, Model, Data : in Data_Pairs;
+                             Model_Spectrum, Data_Spectrum : out Data_Pairs) is
+     use Ada.Numerics.Long_Elementary_Functions;
+     Model_S : Data_Pairs(Model'Range);
+     Data_S : Data_Pairs(Data'Range);
+     Value, Sum : Long_Float := 0.0;
+     F : Long_Float := F_Start;
+     S, C : Long_Float; -- cumulative
+     N : Integer := 1;
+   begin
+      for J in Data'Range loop
+         S := 0.0;
+         C := 0.0;
+         for I in Data'First+8 .. Data'Last loop  -- remove Init value
+            S := S + Sin(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
+            C := C + Cos(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
+         end loop;
+         Data_S(J).Date := F;
+         Data_S(J).Value := (S*S + C*C);
+         if Linear_Step then
+            F := F + Step;
+         else
+            F := F*Mult;
+         end if;
+      end loop;
+      F := F_Start;
+      for J in Model'Range loop
+         S := 0.0;
+         C := 0.0;
+         for I in Model'First+8 .. Model'Last loop  -- remove Init value
+            S := S + Sin(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
+            C := C + Cos(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
+         end loop;
+         Model_S(J).Date := F;
+         Model_S(J).Value := (S*S + C*C);
+         if Linear_Step then
+            F := F + Step;
+         else
+            F := F*Mult;
+         end if;
       end loop;
       Model_Spectrum := Model_S;
       Data_Spectrum := Data_S;
    end ME_Power_Spectrum;
+
+   function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float is
+      First : Positive := X'First;
+      Last : Positive := X'Last;
+      Mid : Positive := (First+Last)/2;
+      FD : Data_Pairs := Y(First..Mid);
+      LD : Data_Pairs := Y(Mid..Last);
+   begin
+      if GEM.Getenv("MERMS", False) then
+         return Min_Entropy_RMS (X, Y);
+      else
+         ME_Power_Spectrum (X, FD, LD, FD, LD);
+         return CC(Filter9Point(FD), Filter9Point(LD));
+         -- return CC(Window(FD,2), Window(LD,2));
+      end if;
+   end Min_Entropy_Power_Spectrum;
 
 
    --
@@ -391,6 +476,8 @@ package body GEM.LTE.Primitives is
          else
             ME_Power_Spectrum (Forcing=>Forcing, Model=>Model, Data=>Data,
                                Model_Spectrum=>Model_S, Data_Spectrum=>Data_S);
+            Model_S := Window(Model_S,2);
+            Data_S := Window(Data_S,2);
          end if;
          for I in Data'Range loop
             Text_IO.Put_Line(FT, Data(I).Date'Img & ", " & Model(I).Value'Img &
@@ -517,6 +604,7 @@ package body GEM.LTE.Primitives is
    exception
       when Constraint_Error => -- Singular
          Text_IO.Put_Line("Singular result, converging?");
+         delay 1.0;
          return Nil; -- Source;  -- Doesn't matter, will give a junk result
    end Regression_Coefficients;
 
@@ -535,8 +623,9 @@ package body GEM.LTE.Primitives is
 
       use Ada.Numerics.Long_Elementary_Functions;
       Pi : Long_Float := Ada.Numerics.Pi;
-      Add_Trend : Integer := Integer(Secular_Trend);
-      -- Add_Trend : Integer := Boolean'Pos(Trend);
+      Trend : Boolean := Secular_Trend > 0.0;
+      -- Add_Trend : Integer := Integer(Secular_Trend);
+      Add_Trend : Integer := Boolean'Pos(Trend);
       Num_Coefficients : constant Integer := 2 + NM*2 + Add_Trend; -- !!! sin + cos mod
       RData : Vector (1 .. Last-First+1);
       Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. Num_Coefficients);

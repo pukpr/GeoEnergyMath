@@ -14,7 +14,10 @@ package GEM.LTE is
 
    N : constant := 1.0/(1.0/Draconic - 1.0/Tropical);
    p : constant := 1.0/(1.0/Tropical - 1.0/Anomalistic);
-   Year_Length : constant := 365.2412384;  -- 365.241237718675000;
+   --Year_Length : constant := 365.2412384;  -- 365.241237718675000;
+
+   function Year_Length return Long_Float;
+
 
    type Doodson_Argument is
       record
@@ -186,6 +189,9 @@ package GEM.LTE is
 120.7676296,
 4.536710575,
 4235.964024 );
+
+   procedure Year_Adjustment (Value : in Long_Float;
+                              List : in out Periods);
 
 
 end GEM.LTE;

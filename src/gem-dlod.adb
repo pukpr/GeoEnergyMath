@@ -68,7 +68,8 @@ begin
    --                 Ref_Time => 0.0,
    --                 Scaling => 1.0,
    --                 Cos_Phase => False);
-   Put(CC(D,Model));
+   Put(CC(D,Model), "=CC " );
+   Put(Year_Length, "=Yr", True);
 
 --   for I in Model'Range loop
 --         Text_IO.Put_Line(Model(I).Date'Img & " " & Model(I).Value'Img & " " & D(I).Value'Img);
