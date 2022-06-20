@@ -66,7 +66,7 @@ begin
       D.B.Offset := GEM.Getenv("OFFSET", D.B.Offset);
       D.B.bg := 0.0;
       D.B.mA := 0.0;
-      D.B.shiftT := 0.0;
+      D.B.shiftT := GEM.Getenv("SHIFTT", D.B.shiftT);
       D.B.ImpA := GEM.Getenv("IMPaVALUE", D.B.ImpA);
       D.B.ImpB := GEM.Getenv("IMPbVALUE", D.B.ImpB);
       D.B.mP   := GEM.Getenv("MP",        D.B.mP);

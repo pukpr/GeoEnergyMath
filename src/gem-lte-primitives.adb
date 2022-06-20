@@ -288,8 +288,8 @@ package body GEM.LTE.Primitives is
 
    Pi : constant Long_Float := Ada.Numerics.Pi;
    Mult : constant Long_Float := 1.003;  -- 1.006 1.012 1.02 --1.05
-   Step : constant Long_Float := 0.02;
-   F_Start : constant Long_Float := 0.3; -- 0.01; --1.0
+   Step : constant Long_Float := GEM.Getenv("FSTEP", 0.18); -- 0.04  -- 0.02  ==0.18
+   F_Start : constant Long_Float := 0.3; -- 0.3; -- 0.01; --1.0
    F_End : constant Long_Float := 1000.0;
 
    function Min_Entropy_RMS (X, Y : in Data_Pairs) return Long_Float is
@@ -369,7 +369,8 @@ package body GEM.LTE.Primitives is
    end LTE_Power_Spectrum;
 
    procedure ME_Power_Spectrum (Forcing, Model, Data : in Data_Pairs;
-                             Model_Spectrum, Data_Spectrum : out Data_Pairs) is
+                                Model_Spectrum, Data_Spectrum : out Data_Pairs;
+                                Phase : in Boolean := False) is
      use Ada.Numerics.Long_Elementary_Functions;
      Model_S : Data_Pairs(Model'Range);
      Data_S : Data_Pairs(Data'Range);
@@ -386,7 +387,11 @@ package body GEM.LTE.Primitives is
             C := C + Cos(2.0*Pi*F*Forcing(I).Value)*Data(I).Value;
          end loop;
          Data_S(J).Date := F;
-         Data_S(J).Value := (S*S + C*C);
+         if Phase then
+            Data_S(J).Value := S;
+         else
+            Data_S(J).Value := (S*S + C*C);
+         end if;
          if Linear_Step then
             F := F + Step;
          else
@@ -402,7 +407,11 @@ package body GEM.LTE.Primitives is
             C := C + Cos(2.0*Pi*F*Forcing(I).Value)*Model(I).Value;
          end loop;
          Model_S(J).Date := F;
-         Model_S(J).Value := (S*S + C*C);
+         if Phase then
+            Model_S(J).Value := S;
+         else
+            Model_S(J).Value := (S*S + C*C);
+         end if;
          if Linear_Step then
             F := F + Step;
          else
@@ -423,7 +432,7 @@ package body GEM.LTE.Primitives is
       if GEM.Getenv("MERMS", False) then
          return Min_Entropy_RMS (X, Y);
       else
-         ME_Power_Spectrum (X, FD, LD, FD, LD);
+         ME_Power_Spectrum (X, FD, LD, FD, LD, False);
          return CC(Filter9Point(FD), Filter9Point(LD));
          -- return CC(Window(FD,2), Window(LD,2));
       end if;
@@ -472,7 +481,8 @@ package body GEM.LTE.Primitives is
          Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
          if Is_Minimum_Entropy then
             ME_Power_Spectrum (Forcing=>Model, Model=>Forcing, Data=>Data,
-                               Model_Spectrum=>Model_S, Data_Spectrum=>Data_S);
+                               Model_Spectrum=>Model_S, Data_Spectrum=>Data_S,
+                               Phase => False);
          else
             ME_Power_Spectrum (Forcing=>Forcing, Model=>Model, Data=>Data,
                                Model_Spectrum=>Model_S, Data_Spectrum=>Data_S);

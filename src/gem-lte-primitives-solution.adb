@@ -302,6 +302,7 @@ package body GEM.LTE.Primitives.Solution is
       RMS_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "RMS";
       ZC_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "ZC";
       Sin_Impulse : constant Boolean := GEM.Getenv("IMPULSE", "DELTA") = "SIN";
+      Sin_Power : constant Positive := GEM.Getenv("SINPOW", 3);
       Sampling_Per_Year : constant Long_Float := GEM.Getenv("SAMPLING", 12.0);
       Filter : constant Long_Float := GEM.Getenv("FILTER", 0.33333333);
       MLR_On : constant Boolean := GEM.Getenv("MLR", FALSE); -- wrong name
@@ -366,12 +367,14 @@ package body GEM.LTE.Primitives.Solution is
          if not Sin_Impulse then
             return Impulse(Time);
          end if;
-         if ImpA > 0 then
+         --if ImpA > 0 then
             -- using the impA & impB env vars as odd & even powers, since they won't be used for impulse
-            null; -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
-         else
-            return Impulse_Power(Time);
-         end if;
+            -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
+         Value := D.B.ImpA*COS(2.0*Pi*(Time+D.B.ImpB));
+         Value := Value**Sin_Power;
+         --else
+         --   return Impulse_Power(Time);
+         --end if;
          return Value; -- + D.B.bg;
       end Impulse_Sin;
 
