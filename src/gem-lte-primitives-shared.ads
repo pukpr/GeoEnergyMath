@@ -64,5 +64,7 @@ package GEM.LTE.Primitives.Shared is
 
    procedure Load (P : in out Param_S);
 
+   procedure Dump (D : in Param_S);
+
 
 end GEM.LTE.Primitives.Shared;

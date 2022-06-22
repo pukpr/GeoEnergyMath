@@ -17,5 +17,10 @@ package GEM is
    type Ns is array(Positive range <> ) of Positive;
    function S_to_I (S : in string) return Ns;
 
+   -- List of floats from "1.0 2.0 4.2 6.4" etc
+   type Fs is array(Positive range <> ) of Long_Float;
+   function S_to_LF (S : in string) return Fs;
+
+   function Command_Line_Option_Exists(Option : in String) return Boolean;
 
 end GEM;

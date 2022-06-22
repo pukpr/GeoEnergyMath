@@ -370,6 +370,7 @@ package body GEM.LTE.Primitives is
 
    procedure ME_Power_Spectrum (Forcing, Model, Data : in Data_Pairs;
                                 Model_Spectrum, Data_Spectrum : out Data_Pairs;
+                                RMS : out Long_Float;
                                 Phase : in Boolean := False) is
      use Ada.Numerics.Long_Elementary_Functions;
      Model_S : Data_Pairs(Model'Range);
@@ -392,6 +393,8 @@ package body GEM.LTE.Primitives is
          else
             Data_S(J).Value := (S*S + C*C);
          end if;
+         Value := Value + Data_S(J).Value;
+         Sum := Sum + Sqrt(Data_S(J).Value);
          if Linear_Step then
             F := F + Step;
          else
@@ -412,6 +415,8 @@ package body GEM.LTE.Primitives is
          else
             Model_S(J).Value := (S*S + C*C);
          end if;
+         Value := Value + Model_S(J).Value;
+         Sum := Sum + Sqrt(Model_S(J).Value);
          if Linear_Step then
             F := F + Step;
          else
@@ -420,6 +425,8 @@ package body GEM.LTE.Primitives is
       end loop;
       Model_Spectrum := Model_S;
       Data_Spectrum := Data_S;
+      Sum := Sum*Sum/Long_Float(N*N) ;
+      RMS := (Value-Sum)/Sum;
    end ME_Power_Spectrum;
 
    function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float is
@@ -428,12 +435,14 @@ package body GEM.LTE.Primitives is
       Mid : Positive := (First+Last)/2;
       FD : Data_Pairs := Y(First..Mid);
       LD : Data_Pairs := Y(Mid..Last);
+      RMS : Long_Float;
    begin
       if GEM.Getenv("MERMS", False) then
          return Min_Entropy_RMS (X, Y);
       else
-         ME_Power_Spectrum (X, FD, LD, FD, LD, False);
-         return CC(Filter9Point(FD), Filter9Point(LD));
+         ME_Power_Spectrum (X, FD, LD, FD, LD, RMS, False);
+         return RMS *
+           CC(Filter9Point(FD), Filter9Point(LD));
          -- return CC(Window(FD,2), Window(LD,2));
       end if;
    end Min_Entropy_Power_Spectrum;
@@ -477,15 +486,17 @@ package body GEM.LTE.Primitives is
          FT : Text_IO.File_Type;
          Model_S : Data_Pairs := Model;
          Data_S : Data_Pairs := Data;
+         RMS : LONG_FLOAT;
       begin
          Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
          if Is_Minimum_Entropy then
             ME_Power_Spectrum (Forcing=>Model, Model=>Forcing, Data=>Data,
                                Model_Spectrum=>Model_S, Data_Spectrum=>Data_S,
-                               Phase => False);
+                               RMS => RMS, Phase => False);
          else
             ME_Power_Spectrum (Forcing=>Forcing, Model=>Model, Data=>Data,
-                               Model_Spectrum=>Model_S, Data_Spectrum=>Data_S);
+                               Model_Spectrum=>Model_S, Data_Spectrum=>Data_S,
+                               RMS => RMS);
             Model_S := Window(Model_S,2);
             Data_S := Window(Data_S,2);
          end if;

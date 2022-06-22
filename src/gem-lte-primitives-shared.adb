@@ -1,6 +1,7 @@
 with Ada.Direct_IO;
 with Ada.Command_Line;
 with Ada.Text_IO;
+with GNAT.OS_Lib;
 
 package body GEM.LTE.Primitives.Shared is
 
@@ -81,6 +82,10 @@ package body GEM.LTE.Primitives.Shared is
    begin
       Open(FT, In_File, FN);
       Read (FT, P);
+      if GEM.Command_Line_Option_Exists("p") then
+         Dump(P);
+         GNAT.OS_Lib.Os_Exit(0);
+      end if;
       Close (FT);
    exception
       when others =>
@@ -89,5 +94,23 @@ package body GEM.LTE.Primitives.Shared is
             Close(FT);
          end if;
    end Load;
+
+   procedure Dump (D : in Param_S) is
+   begin
+         Put(D.B.Offset, " :offset:", NL);
+         Put(D.B.Bg,     " :bg:", NL);
+         Put(D.B.ImpA,   " :impA:", NL);
+         Put(D.B.ImpB,   " :impB:", NL);
+         Put(D.B.mA,     " :mA:", NL);
+         Put(D.B.mP,     " :mP:", NL);
+         Put(D.B.shiftT, " :shiftT:", NL);
+         Put(D.B.init,   " :init:", NL);
+         Ada.Text_IO.Put_Line("---- Tidal ----");
+         for I in D.B.LPAP'Range loop
+            Put(D.A.LP(I), ", ");
+            Put(D.B.LPAP(I).Amplitude, ", ");
+            Put(D.B.LPAP(I).Phase, I'Img, NL);
+         end loop;
+   end Dump;
 
 end GEM.LTE.Primitives.Shared;

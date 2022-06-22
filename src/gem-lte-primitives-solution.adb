@@ -244,8 +244,8 @@ package body GEM.LTE.Primitives.Solution is
       ID : Integer;
       Name : String := GEM.Getenv(Name => "CLIMATE_INDEX",
                                   Default => "nino34_soi.txt");
-      Split : Boolean := not (GEM.Getenv(Name => "SPLIT_TRAINING",   --FIX
-                                         Default => "") = "");
+      Split : Boolean := GEM.Getenv(Name => "SPLIT_TRAINING",
+                                    Default => FALSE);
    begin
       Monitor.Client(ID);
       Text_IO.Put_Line(Name & " for Thread #" & ID'Img & Thread.CPU'Img);
@@ -370,8 +370,8 @@ package body GEM.LTE.Primitives.Solution is
          --if ImpA > 0 then
             -- using the impA & impB env vars as odd & even powers, since they won't be used for impulse
             -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
-         Value := D.B.ImpA*COS(2.0*Pi*(Time+D.B.ImpB));
-         Value := Value**Sin_Power;
+         Value := COS(2.0*Pi*(Time+D.B.ImpB));
+         Value :=  D.B.ImpA*Value**Sin_Power;
          --else
          --   return Impulse_Power(Time);
          --end if;
@@ -634,22 +634,10 @@ package body GEM.LTE.Primitives.Solution is
 
          GEM.LTE.Primitives.Shared.Save(DKeep);
          -- Walker.Dump(Keep); -- Print results of last best evaluation,
-         Put(D.B.Offset, " :offset:", NL);
-         Put(D.B.Bg,     " :bg:", NL);
-         Put(D.B.ImpA,   " :impA:", NL);
-         Put(D.B.ImpB,   " :impB:", NL);
-         Put(D.B.mA,     " :mA:", NL);
-         Put(D.B.mP,     " :mP:", NL);
-         Put(D.B.shiftT, " :shiftT:", NL);
-         Put(D.B.init,   " :init:", NL);
-         Put(Secular_Trend, " :trend:", NL);
-         Text_IO.Put_Line("---- Tidal ----");
-         for I in D.B.LPAP'Range loop
-            Put(D.A.LP(I), ", ");
-            Put(D.B.LPAP(I).Amplitude, ", ");
-            Put(D.B.LPAP(I).Phase, I'Img, NL);
-         end loop;
+         GEM.LTE.Primitives.Shared.Dump(DKeep);
+
          Text_IO.Put_Line("---- LTE ----");
+         Put(Secular_Trend, " :trend:", NL);
          Put(D.A.K0,     " :K0:", NL);
          Put(D.A.Level,  " :level:", NL);
          for I in 1 .. NM loop
