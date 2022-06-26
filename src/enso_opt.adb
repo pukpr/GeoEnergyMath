@@ -63,12 +63,14 @@ begin
       D.B.LT(2) := GEM.Getenv("LT2", D.B.LT(2));
       D.B.LT(3) := GEM.Getenv("LT3", D.B.LT(3));
       D.B.LT(4) := GEM.Getenv("LT4", D.B.LT(4));
+      D.B.LT(5) := GEM.Getenv("LT5", D.B.LT(5));
+      D.B.LT(6) := GEM.Getenv("LT6", D.B.LT(6));
       D.B.Offset := GEM.Getenv("OFFSET", D.B.Offset);
-      D.B.bg := 0.0;
-      D.B.mA := 0.0;
+      D.B.bg :=    GEM.Getenv("BG", D.B.bg);
       D.B.shiftT := GEM.Getenv("SHIFTT", D.B.shiftT);
-      D.B.ImpA := GEM.Getenv("IMPaVALUE", D.B.ImpA);
-      D.B.ImpB := GEM.Getenv("IMPbVALUE", D.B.ImpB);
+      D.B.ImpA := GEM.Getenv("IMPAVALUE", D.B.ImpA);
+      D.B.ImpB := GEM.Getenv("IMPBVALUE", D.B.ImpB);
+      D.B.mA   := GEM.Getenv("MA",        D.B.mA);
       D.B.mP   := GEM.Getenv("MP",        D.B.mP);
       D.B.Init := GEM.Getenv("INIT",      D.B.Init);
 

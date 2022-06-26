@@ -287,7 +287,7 @@ package body GEM.LTE.Primitives.Solution is
       DKeep : Shared.Param_S(N_Tides, N_Modulations) := D;
       D0 : constant Shared.Param_S := D;  -- reference
 
-      ImpA : constant Integer := GEM.Getenv("IMPA", 3); -- Defaults for ENSO
+      ImpA : constant Long_Float := GEM.Getenv("IMPA", 0.25); -- Defaults for ENSO
       ImpB : constant Integer := GEM.Getenv("IMPB", 9);
       ImpC : constant Integer := GEM.Getenv("IMPC", -1);
       ImpD : constant Integer := GEM.Getenv("IMPD", -1);
@@ -302,13 +302,15 @@ package body GEM.LTE.Primitives.Solution is
       RMS_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "RMS";
       ZC_Metric : constant Boolean := GEM.Getenv("METRIC", "CC") = "ZC";
       Sin_Impulse : constant Boolean := GEM.Getenv("IMPULSE", "DELTA") = "SIN";
-      Sin_Power : constant Positive := GEM.Getenv("SINPOW", 3);
+      Sin_Power : constant Integer := GEM.Getenv("SINPOW", 3); --posituve
       Sampling_Per_Year : constant Long_Float := GEM.Getenv("SAMPLING", 12.0);
       Filter : constant Long_Float := GEM.Getenv("FILTER", 0.33333333);
       MLR_On : constant Boolean := GEM.Getenv("MLR", FALSE); -- wrong name
       Forcing_Only : constant Boolean := GEM.Getenv("FORCING", FALSE);
       Calibrate : constant Boolean :=  GEM.Getenv("CAL", FALSE);
       Pareto : constant Boolean :=  GEM.Getenv("PARETO", FALSE);
+      Filter9Pt : constant Integer :=  GEM.Getenv("F9", 0);
+      Climate_Trend : constant Boolean := GEM.Getenv("TREND", FALSE);
       RMS_Data : Long_Float := 0.0;
 
       function Metric (X, Y, Z : in Data_Pairs) return Long_Float is
@@ -331,15 +333,13 @@ package body GEM.LTE.Primitives.Solution is
          Value : Long_Float;
          -- Impulses will occur on a month for monthly data
          Trunc : Integer := Integer((Time - Long_Float'Floor(Time))*Sampling_Per_Year);
+         DPos : Integer := Integer(D.B.Offset*Long_Float(Sampling_Per_Year));
+         Other_Half : Integer := Integer(Sampling_Per_Year/2.0);
       begin
-         if Trunc = ImpA then
-            Value := D.B.ImpA;
-         elsif Trunc = ImpB then
-            Value := -D.B.ImpA + D.B.ImpB; -- delta on inverse
-         elsif Trunc = ImpC then
-            Value := D.B.ImpB; -- perturbation
-         elsif Trunc = ImpD then
-            Value := 0.0; -- D.B.ImpD;
+         if Trunc = DPos then
+            Value := 1.0;
+         elsif Trunc = DPos + Other_Half then
+            Value := -1.0; -- + D.B.ImpB; -- delta on inverse
          else
             Value := 0.0;
          end if;
@@ -347,14 +347,11 @@ package body GEM.LTE.Primitives.Solution is
       end Impulse;
 
       function Impulse_Power (Time : Long_Float) return Long_Float is
-         Pi : Long_Float := Ada.Numerics.Pi;
-         Value : Long_Float := 0.0;
-         use Ada.Numerics.Long_Elementary_Functions;
       begin
          -- Optimize the impulse power, this will create an even and odd impulse
          --Value := D.B.ImpA*(abs(COS(2.0*Pi*(Time+D.B.ImpB))))**D.B.ImpD
          --        +D.B.ImpC*(abs(COS(2.0*Pi*(Time+D.B.ImpB))))**D.B.ImpD * COS(2.0*Pi*(Time+D.B.ImpB));
-         return Value; -- + D.B.bg;
+         return 0.0; -- + D.B.bg;
       end Impulse_Power;
 
 
@@ -363,15 +360,23 @@ package body GEM.LTE.Primitives.Solution is
          Value : Long_Float := 0.0;
          use Ada.Numerics.Long_Elementary_Functions;
          -- scale*(COS(2*PI*(E2+ip)))^2+D17*(COS(2*PI*(E2+ip)))^3
+         -- Power : Positive := 2*abs(Integer(D.B.bg))+1; -- must be +odd
       begin
          if not Sin_Impulse then
-            return Impulse(Time);
+            return D.B.ImpA*Impulse(Time);
          end if;
          --if ImpA > 0 then
             -- using the impA & impB env vars as odd & even powers, since they won't be used for impulse
             -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
          Value := COS(2.0*Pi*(Time+D.B.ImpB));
-         Value :=  D.B.ImpA*Value**Sin_Power;
+         if Sin_Power > 0 then
+            Value :=  D.B.ImpA*Value**Sin_Power;
+         elsif Sin_Power < 0 then
+            Value := D.B.ImpA*Value*(abs(Value))**(D.B.bg-1.0);
+         else
+            Value := ImpA * ((1.0-D.B.ImpA) * Impulse(Time) +
+                     D.B.ImpA*Value*(abs(Value))**(D.B.bg-1.0));
+         end if;
          --else
          --   return Impulse_Power(Time);
          --end if;
@@ -474,7 +479,7 @@ package body GEM.LTE.Primitives.Solution is
 
          der := 1.0 - D.B.mA - D.B.mP; -- keeps the integrator stable
 
-         GEM.LTE.Year_Adjustment(D.B.Offset, D.A.LP);
+         -- GEM.LTE.Year_Adjustment(D.B.Offset, D.A.LP);
 
          Impulses := Impulse_Amplify(
                             Raw     => Tide_Sum(Template     => Data_Records,
@@ -503,7 +508,11 @@ package body GEM.LTE.Primitives.Solution is
             M(NM+I) := LONG_FLOAT(Harms(I)) * M(NM);
          end loop;
          if MLR_On or not (Forcing_Only or Is_Minimum_Entropy) then -- MLR_On
-              Secular_Trend := 1.0;
+              if Climate_Trend then
+                 Secular_Trend := 1.0;
+              else
+                 Secular_Trend := 0.0;
+              end if;
               Regression_Factors (Data_Records => Data_Records, -- Time series
                                   First => First,
                                   Last => Last,  -- Training Interval
@@ -541,8 +550,14 @@ package body GEM.LTE.Primitives.Solution is
                          K0 => D.A.K0,
                          Trend => Secular_Trend);  -- D.LT GEM.LTE.LT0
 
-            -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
-            Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
+               -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
+            if Filter9Pt > 0 then
+               for F in 1..Filter9Pt loop
+                  Model := Filter9Point(Model);
+               end loop;
+            else
+               Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
+            end if;
          end if;
 
 

@@ -10,14 +10,28 @@ with Gnat.Os_Lib;
 package body GEM.LTE.Primitives is
    Aliased_Period : constant Boolean := GEM.Getenv("ALIAS", FALSE);
    Min_Entropy : constant Boolean := GEM.Getenv("METRIC", "") = "ME";
-   -- Trend : constant Boolean := GEM.Getenv("TREND", TRUE);
    Linear_Step : constant Boolean := GEM.Getenv("STEP", FALSE);
+   Every_N_Line : constant Integer := GEM.Getenv("EVERY", 1);
 
 
    function Is_Minimum_Entropy return Boolean is
    begin
       return Min_Entropy;
    end Is_Minimum_Entropy;
+
+   function Reduce (Raw : in Data_Pairs; -- Raw starts with line 1
+                    Every : in Positive) return Data_Pairs is
+      Res : Data_Pairs(1..Raw'Length/Every) := (others => (0.0, 0.0));
+   begin
+      for I in Res'Range loop
+         for J in I*Every .. I*Every + Every - 1 loop
+            Res(I).Value := Res(I).Value + Raw(J-Every+1).Value;
+         end loop;
+         Res(I).Value := Res(I).Value/Long_Float(Every);
+         Res(I).Date := Raw(I*Every-Every/2).Date;
+      end loop;
+      return Res;
+   end Reduce;
 
    function File_Lines (Name : String) return Integer is
       Data  : Text_IO.File_Type;
@@ -56,7 +70,11 @@ package body GEM.LTE.Primitives is
          Arr(I) := (Date, Value);
       end loop;
       Text_IO.Close(File => Data);
-      return Arr;
+      if Every_N_Line = 1 then
+         return Arr;
+      else
+         return Reduce(Arr, Every_N_Line);
+      end if;
    exception
       when E : Others =>
          Text_IO.Put_Line(Ada.Exceptions.Exception_Information(E));
@@ -441,7 +459,7 @@ package body GEM.LTE.Primitives is
          return Min_Entropy_RMS (X, Y);
       else
          ME_Power_Spectrum (X, FD, LD, FD, LD, RMS, False);
-         return RMS *
+         return -- RMS *
            CC(Filter9Point(FD), Filter9Point(LD));
          -- return CC(Window(FD,2), Window(LD,2));
       end if;
@@ -555,7 +573,6 @@ package body GEM.LTE.Primitives is
       end loop;
       return Res;
    end Window;
-
 
    -- Regression procedures
 --   package MLR is new Gem.Matrices (
@@ -707,7 +724,7 @@ package body GEM.LTE.Primitives is
    begin
       for I in Raw'First + 4 .. Raw'Last - 4 loop
          Res(I).Value :=
-           1.0/9.0 * ( 0.25*(Raw(I-4).Value + Raw(I-3).Value + Raw(I-2).Value)+
+           1.0/3.0 * ( 0.25*(Raw(I-4).Value + Raw(I-3).Value + Raw(I-2).Value)+
                        0.5*(Raw(I-1).Value + Raw(I).Value + Raw(I+1).Value)+
                        0.25*(Raw(I+2).Value + Raw(I+3).Value + Raw(I+4).Value) );
       end loop;

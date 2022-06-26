@@ -6,15 +6,16 @@ with Ada.Long_Float_Text_IO;
 
 package body GEM is
 
-   type Options is (ALIAS, CAL, CLIMATE_INDEX, DLOD_REF, FILTER, FLIP, FORCING,
+   type Options is (ALIAS, CAL, CLIMATE_INDEX, DLOD_REF, EVERY, FILTER, FLIP, FORCING,
                     FSTEP, IMPA, IMPB, IMPC, IMPD, IMPULSE, IR, MAXH, MAXLOOPS,
                     MERMS, METRIC, MLR, NH, NM, PARETO, RESET, SAMPLING,
-                    SCALING, SIMPOW, SPLIT_LOW, SPLIT_TRAINING, SPREAD_CYCLE,
+                    SCALING, SINPOW, SPLIT_LOW, SPLIT_TRAINING, SPREAD_CYCLE,
                     SPREAD_MIN, SPREAD_MAX, STARTING_METRIC, STEP, THRESHOLD,
-                    THRESHOLD_ACTION, TRAIN_END, TRAIN_START, TREND, YEAR,
+                    THRESHOLD_ACTION, TRAIN_END, TRAIN_START, TREND, YEAR, F9,
                     -- typically temporary overrides
-                    LT1, LT2, LT3, LT4, OFFSET, SHIFTT, IMPAVALUE, IMPBVALUE,
-                    MP, INIT, REF_TIME
+                    LT1, LT2, LT3, LT4, LT5, LT6,
+                    OFFSET, SHIFTT, IMPAVALUE, IMPBVALUE,
+                    MA, MP, INIT, REF_TIME, BG
                    );
 
    type Option_Pair is

@@ -11,8 +11,8 @@ IMPB                           9
 IMPC                           -1
 IMPD                           -1
 IMPULSE                        SIN
-INPUTAVALUE                    10.0000
-INPUTBVALUE                    0.00001
+-INPUTAVALUE                    10.0000
+-INPUTBVALUE                    0.00001
 IR                             0.0
 MAXH                           100
 MAXLOOPS                       100000
@@ -25,7 +25,7 @@ PARETO                         FALSE
 RESET                          FALSE
 SAMPLING                       12.0
 SCALING                        1.0
-SIMPOW                         7
+SINPOW                         -3
 SPLIT_LOW                      FALSE
 SPLIT_TRAINING                 FALSE
 SPREAD_CYCLE                   1000.0
@@ -38,4 +38,8 @@ THRESHOLD_ACTION               CATCHUP
 TRAIN_END                      2016
 TRAIN_START                    1959
 TREND                          TRUE
-YEAR                           0.001
+YEAR                           0.0010236
+OFFSET                         0.0
+BG                             3.0
+
+

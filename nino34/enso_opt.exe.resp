@@ -37,4 +37,5 @@ THRESHOLD_ACTION               CATCHUP
 TRAIN_END                      2010
 TRAIN_START                    1890
 TREND                          TRUE
-YEAR                           0.001
+YEAR                           0.00100007
+OFFSET                         0.25

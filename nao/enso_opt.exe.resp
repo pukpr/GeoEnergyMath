@@ -23,7 +23,7 @@ PARETO                         FALSE
 RESET                          FALSE
 SAMPLING                       12.0
 SCALING                        1.0
-SIMPOW                         3
+SINPOW                         -3
 SPLIT_LOW                      FALSE
 SPLIT_TRAINING                 FALSE
 SPREAD_CYCLE                   1000.0
@@ -36,4 +36,6 @@ THRESHOLD_ACTION               CATCHUP
 TRAIN_END                      2016
 TRAIN_START                    1955
 TREND                          TRUE
-YEAR                           0.001
+YEAR                           0.00105
+OFFSET                         0.0
+BG                             3.0
