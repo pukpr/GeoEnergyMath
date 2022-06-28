@@ -1,3 +1,4 @@
+REF_TIME                       0.0
 ALIAS                          FALSE
 CAL                            FALSE
 CLIMATE_INDEX                  ao.dat
@@ -17,7 +18,7 @@ MAXLOOPS                       100000
 MERMS                          FALSE
 METRIC                         CC
 MLR                            FALSE
-NH                             "6 5 2 22"
+NH                             "41 100 94 263"
 NM                             3
 PARETO                         FALSE
 RESET                          FALSE
@@ -35,8 +36,8 @@ THRESHOLD                      99
 THRESHOLD_ACTION               CATCHUP
 TRAIN_END                      2016
 TRAIN_START                    1955
-TREND                          TRUE
+TREND                          FALSE
 YEAR                           0.00108057
-OFFSET                         0.0
-BG                             3.0
+-OFFSET                         0.0
+-BG                             3.0
 

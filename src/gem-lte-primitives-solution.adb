@@ -52,6 +52,10 @@ package body GEM.LTE.Primitives.Solution is
       end loop;
       Text_IO.Close(File);
       return Metric;
+   exception
+      when Constraint_Error =>
+         Text_IO.Put_Line("No reference compare");
+         return 0.0;
    end;
 
    -- Multiple Linear Regression types
@@ -370,7 +374,8 @@ package body GEM.LTE.Primitives.Solution is
             -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
          Value := COS(2.0*Pi*(Time+D.B.ImpB));
          if Sin_Power > 0 then
-            Value :=  D.B.ImpA*Value**Sin_Power;
+            --Value :=  D.B.ImpA*Value**Sin_Power;
+            Value := D.B.ImpA*(abs(Value))**(D.B.bg);
          elsif Sin_Power < 0 then
             Value := D.B.ImpA*Value*(abs(Value))**(D.B.bg-1.0);
          else
@@ -551,15 +556,15 @@ package body GEM.LTE.Primitives.Solution is
                          Trend => Secular_Trend);  -- D.LT GEM.LTE.LT0
 
                -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
-            if Filter9Pt > 0 then
-               for F in 1..Filter9Pt loop
-                  Model := Filter9Point(Model);
-               end loop;
-            else
-               Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
-            end if;
          end if;
 
+         if Filter9Pt > 0 then
+            for F in 1..Filter9Pt loop
+               Model := Filter9Point(Model);
+            end loop;
+         else
+            Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
+         end if;
 
          -- pragma Debug ( Dump(Model, Data_Records, Run_Time) );
 

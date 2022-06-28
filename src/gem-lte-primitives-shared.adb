@@ -2,6 +2,7 @@ with Ada.Direct_IO;
 with Ada.Command_Line;
 with Ada.Text_IO;
 with GNAT.OS_Lib;
+with Ada.Long_Float_Text_IO;
 
 package body GEM.LTE.Primitives.Shared is
 
@@ -60,6 +61,49 @@ package body GEM.LTE.Primitives.Shared is
       return P;
    end Get;
 
+   procedure Put (FT : in Ada.Text_IO.File_Type;
+                  Text : in String;
+                  Value : in Long_Float) is
+   begin
+      Ada.Text_IO.Put(FT, Text & " ");
+      Ada.Long_Float_Text_IO.Put(FT, Value, Fore=>4, Aft=>11, Exp=>0);
+      Ada.Text_IO.New_Line(FT);
+   end;
+
+   procedure Put (FT : Ada.Text_IO.File_Type;
+                  V1,V2,V3 : in Long_Float) is
+   begin
+      Ada.Long_Float_Text_IO.Put(FT, V1, Fore=>4, Aft=>11, Exp=>0);
+      Ada.Long_Float_Text_IO.Put(FT, V2, Fore=>4, Aft=>11, Exp=>0);
+      Ada.Long_Float_Text_IO.Put(FT, V3, Fore=>4, Aft=>11, Exp=>0);
+      Ada.Text_IO.New_Line(FT);
+   end;
+
+   procedure Write (D : in Param_S) is
+      FN : constant String := Ada.Command_Line.Command_Name & ".par";
+      FT : Ada.Text_IO.File_Type;
+   begin
+      Ada.Text_IO.Create(FT, Ada.Text_IO.Out_File, FN);
+      Put(FT, "offs", D.B.Offset);
+      Put(FT, "bg  ",     D.B.Bg);
+      Put(FT, "impA",   D.B.ImpA);
+      Put(FT, "impB",   D.B.ImpB);
+      Put(FT, "ma  ",     D.B.mA);
+      Put(FT, "mp  ",     D.B.mP);
+      Put(FT, "shfT", D.B.shiftT);
+      Put(FT, "init",   D.B.init);
+      for I in D.B.LPAP'Range loop
+         Put(FT,
+             D.A.LP(I),
+             D.B.LPAP(I).Amplitude,
+             D.B.LPAP(I).Phase);
+      end loop;
+      for I in D.B.LT'Range loop
+         Put(FT, "ltep", D.B.LT(I));
+      end loop;
+      Ada.Text_IO.Close(FT);
+   end Write;
+
    procedure Save (P : in Param_S) is
       subtype PS is Param_S(P.NLP,P.NLT);
       package DIO is new Ada.Direct_IO(PS);
@@ -70,8 +114,69 @@ package body GEM.LTE.Primitives.Shared is
       Create(FT, Out_File, FN);
       Write(FT, P);
       Close(FT);
+      if GEM.Command_Line_Option_Exists("r") then
+         Write(P);
+      end if;
       -- Server.Put (P);
    end Save;
+
+   procedure Read (FT : in Ada.Text_IO.File_Type;
+                   Text : in String;
+                   Value : in out Long_Float) is
+      Str : String(1..100);
+      N : Integer;
+   begin
+      Ada.Text_IO.Get_Line(FT, Str, N);
+      if Text = Str(1..4) then
+         Ada.Long_Float_Text_IO.Get(Str(5..N), Value, N);
+      else
+         Ada.Text_IO.Put_Line(Text & " mismatches " & Str(1..N));
+         GNAT.OS_Lib.Os_Exit(0);
+      end if;
+   end;
+
+   procedure Read (FT : in Ada.Text_IO.File_Type;
+                  V1,V2,V3 : out Long_Float) is
+      Str : String(1..100);
+      N : Integer;
+      Floats : Fs(1..3);
+      Index : Integer := 1;
+   begin
+      Ada.Text_IO.Get_Line(FT, Str, N);
+      Floats := S_to_LF (Str(1..N));
+      V1 := Floats(1);
+      V2 := Floats(2);
+      V3 := Floats(3);
+   exception
+      when others =>
+         Ada.Text_IO.Put_Line("Finished " & Str(1..N));
+   end;
+
+
+   procedure Read (D : in out Param_S) is
+      FN : constant String := Ada.Command_Line.Command_Name & ".par";
+      FT : Ada.Text_IO.File_Type;
+   begin
+      Ada.Text_IO.Open(FT, Ada.Text_IO.In_File, FN);
+      Read(FT, "offs", D.B.Offset);
+      Read(FT, "bg  ", D.B.Bg);
+      Read(FT, "impA", D.B.ImpA);
+      Read(FT, "impB", D.B.ImpB);
+      Read(FT, "ma  ", D.B.mA);
+      Read(FT, "mp  ", D.B.mP);
+      Read(FT, "shfT", D.B.shiftT);
+      Read(FT, "init", D.B.init);
+      for I in D.B.LPAP'Range loop
+         Read(FT,
+             D.A.LP(I),
+             D.B.LPAP(I).Amplitude,
+             D.B.LPAP(I).Phase);
+      end loop;
+      for I in D.B.LT'Range loop
+         Read(FT, "ltep", D.B.LT(I));
+      end loop;
+      Ada.Text_IO.Close(FT);
+   end Read;
 
    procedure Load (P : in out Param_S) is
       subtype PS is Param_S(P.NLP,P.NLT);
@@ -80,13 +185,23 @@ package body GEM.LTE.Primitives.Shared is
       use DIO;
       FT : File_Type;
    begin
-      Open(FT, In_File, FN);
-      Read (FT, P);
+      begin
+         Open(FT, In_File, FN);
+         Read (FT, P);
+         Close (FT);
+      exception
+         when Name_Error =>
+            Ada.Text_IO.Put_Line ("No PARMS file: " & FN);
+      end;
       if GEM.Command_Line_Option_Exists("p") then
          Dump(P);
          GNAT.OS_Lib.Os_Exit(0);
+      elsif GEM.Command_Line_Option_Exists("w") then
+         Write(P);
+         GNAT.OS_Lib.Os_Exit(0);
+      elsif GEM.Command_Line_Option_Exists("r") then
+         Read(P);
       end if;
-      Close (FT);
    exception
       when others =>
          Ada.Text_IO.Put_Line ("Error:" & FN);
@@ -110,6 +225,10 @@ package body GEM.LTE.Primitives.Shared is
             Put(D.A.LP(I), ", ");
             Put(D.B.LPAP(I).Amplitude, ", ");
             Put(D.B.LPAP(I).Phase, I'Img, NL);
+         end loop;
+         Ada.Text_IO.Put_Line("---- LTE ----");
+         for I in D.B.LT'Range loop
+            Put(D.B.LT(I), "", NL);
          end loop;
    end Dump;
 

@@ -1,8 +1,9 @@
+REF_TIME                       0.0
 ALIAS                          FALSE
 CAL                            FALSE
 CLIMATE_INDEX                  sam.dat
 DLOD_REF                       TRUE
-FILTER                         0.2
+FILTER                         0.333
 FLIP                           0.001
 FORCING                        FALSE
 FSTEP                          1
@@ -19,7 +20,7 @@ MAXLOOPS                       100000
 MERMS                          FALSE
 METRIC                         CC
 MLR                            FALSE
-NH                             "6 5 93 22 38"
+NH                             "178 85 93 139 38"
 NM                             3
 PARETO                         FALSE
 RESET                          FALSE
@@ -37,9 +38,9 @@ THRESHOLD                      99
 THRESHOLD_ACTION               CATCHUP
 TRAIN_END                      2016
 TRAIN_START                    1959
-TREND                          TRUE
+TREND                          FALSE
 YEAR                           0.0010236
-OFFSET                         0.0
-BG                             3.0
+-OFFSET                         0.0
+-BG                             3.0
 
 

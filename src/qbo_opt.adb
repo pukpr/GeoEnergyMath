@@ -3,6 +3,7 @@ with System.Task_Info;
 with GEM.LTE.Primitives.Solution;
 with GEM.LTE.Primitives.Shared;
 with Text_IO;
+with GEM.dLOD;
 
 procedure QBO_Opt is
    N :  Positive := System.Task_Info.Number_Of_Processors;
@@ -17,16 +18,16 @@ procedure QBO_Opt is
          level  => 0.0,
          NLP    => GEM.LTE.QBO'Length,
          NLT    => GEM.LTE.LTM'Length,
-         LPF    => GEM.LTE.QBOF,
+         LP     => GEM.LTE.QBO,
          LTAP   => GEM.LTE.LTAP),
       B =>
         (NLP    => GEM.LTE.QBO'Length,
          NLT    => GEM.LTE.LTM'Length,
-         LP     => GEM.LTE.QBO,
+         LPAP   => GEM.LTE.QBOAP,
          LT     => GEM.LTE.LTM,
          Offset => 0.0,
          bg     => 0.0,
-         ImpA   => 9.0,
+         ImpA   => 1.0, -- 9.0
          ImpB   => 0.0, ---9.0,
          mA     => 0.0,
          mP     => 0.0,
@@ -34,17 +35,30 @@ procedure QBO_Opt is
          init   => 0.0063)
         );
 
+   -- Ref : GEM.LTE.Long_Periods_Amp_Phase := GEM.LTE.LPAP;
 begin
-   GEM.Setenv("IMPA", "4");  -- these are 6-months earlier than 9 & 10
-   GEM.Setenv("IMPB", "10");
-   Text_IO.Put_Line(N'Img & " processors available");
-   GEM.LTE.Primitives.Shared.Load(D); -- if available
-   --D.B.LP(8).Amplitude := 0.02;
-   --D.B.LP(9).Amplitude := 0.001;
-   --D.B.LT(1) := 0.1;
-   GEM.LTE.Primitives.Shared.Put(D);
-   GEM.LTE.Primitives.Solution.Start(D.NLP,D.NLT,N);
+   declare
+      -- AP : Gem.LTE.Long_Periods_Amp_Phase  :=  GEM.dLOD("../dlod3.dat");
+   begin
 
+      Text_IO.Put_Line(N'Img & " processors available");
+      GEM.LTE.Primitives.Shared.Load(D); -- if available
+
+      D.B.LT(1) := GEM.Getenv("LT1", D.B.LT(1));
+      D.B.Offset := GEM.Getenv("OFFSET", D.B.Offset);
+      D.B.bg :=    GEM.Getenv("BG", D.B.bg);
+      D.B.shiftT := GEM.Getenv("SHIFTT", D.B.shiftT);
+      D.B.ImpA := GEM.Getenv("IMPAVALUE", D.B.ImpA);
+      D.B.ImpB := GEM.Getenv("IMPBVALUE", D.B.ImpB);
+      D.B.mA   := GEM.Getenv("MA",        D.B.mA);
+      D.B.mP   := GEM.Getenv("MP",        D.B.mP);
+      D.B.Init := GEM.Getenv("INIT",      D.B.Init);
+
+      GEM.LTE.Primitives.Shared.Put(D);
+
+   end;
+
+   GEM.LTE.Primitives.Solution.Start(D.NLP,D.NLT,N);
 
    for I in 1..Integer'Last loop
       -- delay 1.0;
@@ -52,7 +66,8 @@ begin
       declare
          S : String := GEM.LTE.Primitives.Solution.Status;
       begin
-         if I mod 100 = 0 then
+         if I mod GEM.LTE.Primitives.Solution.Check_Every_N_Loops = 0 then
+         --if I mod 100 = 0 then
             Text_IO.Put_Line(S & " #" & I'Img);
          end if;
       end;
@@ -65,6 +80,8 @@ begin
       exit when GEM.LTE.Primitives.Halted;
    end loop;
    Text_IO.Put_Line("Main exiting, flushing other tasks");
+
+
    delay 5.0;
 
-end QBO_Opt;
+ end QBO_Opt;

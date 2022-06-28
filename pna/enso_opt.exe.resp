@@ -1,3 +1,4 @@
+REF_TIME                       0.0
 ALIAS                          FALSE
 CAL                            FALSE
 CLIMATE_INDEX                  pna.dat
@@ -17,7 +18,7 @@ MAXLOOPS                       100000
 MERMS                          FALSE
 METRIC                         CC
 MLR                            FALSE
-NH                             "6 8 4 22"
+NH                             "85 110 90 326"
 NM                             3
 PARETO                         FALSE
 RESET                          FALSE
@@ -37,5 +38,5 @@ TRAIN_END                      2016
 TRAIN_START                    1955
 TREND                          TRUE
 YEAR                           0.0011365
-OFFSET                         0.0
-BG                             3.0
+-OFFSET                         0.0
+-BG                             3.0
