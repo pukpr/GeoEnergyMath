@@ -14,7 +14,7 @@ package GEM is
    procedure Clear (Name : in String);
 
    -- List of integers from "1 2 4 6" etc
-   type Ns is array(Positive range <> ) of Positive;
+   type Ns is array(Positive range <> ) of Integer;
    function S_to_I (S : in string) return Ns;
 
    -- List of floats from "1.0 2.0 4.2 6.4" etc

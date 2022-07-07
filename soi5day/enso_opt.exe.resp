@@ -1,13 +1,14 @@
 REF_TIME                       0.0
 ALIAS                          FALSE
 CAL                            FALSE
-CLIMATE_INDEX                  mjo.dat
+CLIMATE_INDEX                  soidaily.dat
 DLOD_REF                       TRUE
+EVERY                          5
 FILTER                         0.33
 FLIP                           0.001
 FORCING                        FALSE
 FSTEP                          0.18
-F9                             2
+F9                             1
 IMPA                           10.0
 IMPULSE                        SIN
 IR                             0.0
@@ -16,10 +17,11 @@ MAXLOOPS                       100000
 MERMS                          FALSE
 METRIC                         CC
 MLR                            FALSE
-NH                             "5 10 15 25 190 380"
+NH                             "276 240 15 25 190 380"
 NM                             1
 PARETO                         False
 RESET                          FALSE
+SAMPLING10                       36.5242
 SAMPLING                       73.04
 SCALING                        1.0
 SINPOW                         0
@@ -32,15 +34,15 @@ STARTING_METRIC                0.001
 STEP                           TRUE
 THRESHOLD                      99
 THRESHOLD_ACTION               CATCHUP
-TRAIN_END                      2020
-TRAIN_START                    1980
-TREND                          FALSE
+TRAIN_END                      2017
+TRAIN_START                    1993
+TREND                          TRUE
 YEAR                           0.01
 -OFFSET                         0.25
 -IMPAVALUE                      0.501
 -IMPBVALUE                      0.1
 -BG                             7.0
---SHIFTT                         0.0099999
---INIT                           -0.972
+-SHIFTT                         0.0575
+-INIT                           0.00001
 --MP                             0.00000001
---MA                             0.00000001
+-MA                             0.00000001

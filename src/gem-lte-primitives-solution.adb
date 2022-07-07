@@ -58,6 +58,8 @@ package body GEM.LTE.Primitives.Solution is
          return 0.0;
    end;
 
+
+
    -- Multiple Linear Regression types
 --G   package MLR is new Gem.Matrices (
 --G      Element_Type => Long_Float,
@@ -272,10 +274,10 @@ package body GEM.LTE.Primitives.Solution is
 
       Data_Records : Data_Pairs := Make_Data(File_Name);
 
+      --function Impulse_Delta (Time : Long_Float) return Long_Float;
       function Impulse (Time : Long_Float) return Long_Float;
-      function Impulse_Sin (Time : Long_Float) return Long_Float;
 
-      function Impulse_Amplify is new Amplify(Impulse => Impulse_Sin);
+      function Impulse_Amplify is new Amplify(Impulse => Impulse);
 
       Ref_Time : Long_Float := GEM.Getenv("REF_TIME", Data_Records(Data_Records'First).Date);
       Impulses : Data_Pairs := Data_Records;
@@ -333,30 +335,22 @@ package body GEM.LTE.Primitives.Solution is
          end if;
       end Metric;
 
-      function Impulse (Time : Long_Float) return Long_Float is
+      function Impulse_Delta (Time : Long_Float) return Long_Float is
          Value : Long_Float;
          -- Impulses will occur on a month for monthly data
          Trunc : Integer := Integer((Time - Long_Float'Floor(Time))*Sampling_Per_Year);
-         DPos : Integer := Integer(D.B.Offset*Long_Float(Sampling_Per_Year));
+         DPos : Integer := Integer(D.B.delB*Long_Float(Sampling_Per_Year));
          Other_Half : Integer := Integer(Sampling_Per_Year/2.0);
       begin
          if Trunc = DPos then
             Value := 1.0;
          elsif Trunc = DPos + Other_Half then
-            Value := -1.0; -- + D.B.ImpB; -- delta on inverse
+            Value := -1.0; -- delta on inverse
          else
             Value := 0.0;
          end if;
          return Value; -- + D.B.bg;
-      end Impulse;
-
-      function Impulse_Power (Time : Long_Float) return Long_Float is
-      begin
-         -- Optimize the impulse power, this will create an even and odd impulse
-         --Value := D.B.ImpA*(abs(COS(2.0*Pi*(Time+D.B.ImpB))))**D.B.ImpD
-         --        +D.B.ImpC*(abs(COS(2.0*Pi*(Time+D.B.ImpB))))**D.B.ImpD * COS(2.0*Pi*(Time+D.B.ImpB));
-         return 0.0; -- + D.B.bg;
-      end Impulse_Power;
+      end Impulse_Delta;
 
 
       function Impulse_Sin (Time : Long_Float) return Long_Float is
@@ -366,27 +360,58 @@ package body GEM.LTE.Primitives.Solution is
          -- scale*(COS(2*PI*(E2+ip)))^2+D17*(COS(2*PI*(E2+ip)))^3
          -- Power : Positive := 2*abs(Integer(D.B.bg))+1; -- must be +odd
       begin
-         if not Sin_Impulse then
-            return D.B.ImpA*Impulse(Time);
-         end if;
+         --if not Sin_Impulse then
+         --   return D.B.delA*Impulse_Delta(Time);
+         --end if;
          --if ImpA > 0 then
             -- using the impA & impB env vars as odd & even powers, since they won't be used for impulse
             -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
          Value := COS(2.0*Pi*(Time+D.B.ImpB));
          if Sin_Power > 0 then
             --Value :=  D.B.ImpA*Value**Sin_Power;
-            Value := D.B.ImpA*(abs(Value))**(D.B.bg);
+            Value := D.B.ImpA*(abs(Value))**(D.B.bg); -- all positive
          elsif Sin_Power < 0 then
-            Value := D.B.ImpA*Value*(abs(Value))**(D.B.bg-1.0);
+            Value := D.B.ImpA*Value*(abs(Value))**(D.B.ImpC-1.0);
          else
-            Value := ImpA * ((1.0-D.B.ImpA) * Impulse(Time) +
-                     D.B.ImpA*Value*(abs(Value))**(D.B.bg-1.0));
+            --Value := ImpA * ((1.0-D.B.ImpA) * Impulse(Time) +
+            --         D.B.ImpA*Value*(abs(Value))**(D.B.bg-1.0));
+            Value := D.B.delA * Impulse_Delta(Time) +
+                     D.B.ImpA*Value*(abs(Value))**(D.B.ImpC-1.0);
          end if;
          --else
          --   return Impulse_Power(Time);
          --end if;
          return Value; -- + D.B.bg;
       end Impulse_Sin;
+
+      function Impulse (Time : Long_Float) return Long_Float is
+         Value : Long_Float;
+      begin
+         -- Optimize the impulse power, this will create an even and odd impulse
+         --Value := D.B.ImpA*(abs(COS(2.0*Pi*(Time+D.B.ImpB))))**D.B.ImpD
+         --        +D.B.ImpC*(abs(COS(2.0*Pi*(Time+D.B.ImpB))))**D.B.ImpD * COS(2.0*Pi*(Time+D.B.ImpB));
+         if Sin_Impulse then
+            Value := Impulse_Sin(Time); -- + D.B.bg;
+         else
+            Value := D.B.delA*Impulse_Delta(Time);
+         end if;
+         if Value < 0.0 then
+            Value := Value + D.B.Asym;
+         end if;
+         return Value + D.B.bg;
+      end Impulse;
+
+   function Annual_Add (Model : in Data_Pairs) return Data_Pairs is
+      M : Data_Pairs := Model;
+      Pi : Long_Float := Ada.Numerics.Pi;
+      use Ada.Numerics.Long_Elementary_Functions;
+   begin
+      for I in Model'Range loop
+            M(I).Value := M(I).Value + D.B.Ann1*Cos(2.0*Pi*M(I).Date + D.B.Ann2)
+              + D.B.Sem1*Cos(4.0*Pi*M(I).Date + D.B.Sem2);
+      end loop;
+      return M;
+   end;
 
       procedure Put_CC (Val1, Val2 : in Long_Float;
                         Counter : in Long_Integer;
@@ -456,6 +481,7 @@ package body GEM.LTE.Primitives.Solution is
       MAP : Modulations_Amp_Phase (1 .. NM + NH);
       Pareto_Scale : Long_Float;
       Pareto_Start : Positive;
+
    begin
       --  if Harms = Test_Harms then
       --     Text_IO.Put_Line("HARMS PASSED" & Test_Harms'Length'Img);
@@ -473,8 +499,18 @@ package body GEM.LTE.Primitives.Solution is
       RMS_Data := Ada.Numerics.Long_Elementary_Functions.Sqrt(RMS_Data);
       Old_CC := 0.0;
       Walker.Reset;
+      if Filter9Pt > 0 then
+         for F in 1..Filter9Pt loop
+            Data_Records := Filter9Point(Data_Records);
+         end loop;
+      end if;
       Text_IO.Put_Line("Catchup mode enabled:" & Boolean'Image(Catchup) );
       Keep := Set;
+
+      for I in 1 .. Harms'Length loop
+         exit when D.C(I) = 0;
+         Harms(I) := D.C(I);
+      end loop;
 
       loop
          Counter := Counter + 1;
@@ -484,7 +520,7 @@ package body GEM.LTE.Primitives.Solution is
 
          der := 1.0 - D.B.mA - D.B.mP; -- keeps the integrator stable
 
-         -- GEM.LTE.Year_Adjustment(D.B.Offset, D.A.LP);
+         -- GEM.LTE.Year_Adjustment(D.B.Year, D.A.LP); -- should be a protected call?
 
          Impulses := Impulse_Amplify(
                             Raw     => Tide_Sum(Template     => Data_Records,
@@ -494,7 +530,7 @@ package body GEM.LTE.Primitives.Solution is
                                                 Scaling      => Scaling,
                                                 Year_Len     => Year_Length
                                                ),
-                                     Offset => 0.0, -- D.B.Offset,
+                                     Offset => D.B.Offset,
                                      Ramp => 0.0, -- D.B.bg,
                                      Start => Data_Records(Data_Records'First).Date);
 
@@ -502,11 +538,11 @@ package body GEM.LTE.Primitives.Solution is
                          lagA => der, lagB => D.B.mA, lagC => D.B.mP,
                          iA => D.B.init, iB => 0.0, iC => 0.0, Start => 0.0*(TS-(Ref_Time + D.B.ShiftT)));
 
-         --  add a portion of the impulse back in
-         for I in First .. Last loop
-            Forcing(I).Value := Forcing(I).Value + Impulse_Residual*Impulses(I).Value;
-         end loop;
-
+         --  --  add a portion of the impulse back in
+         --  for I in First .. Last loop
+         --     Forcing(I).Value := Forcing(I).Value + Impulse_Residual*Impulses(I).Value;
+         --  end loop;
+         --
          M(1..NM) := D.B.LT(1..NM);
          MAP(1..NM) := D.A.LTAP(1..NM);
          for I in 1 .. NH loop
@@ -555,7 +591,13 @@ package body GEM.LTE.Primitives.Solution is
                          K0 => D.A.K0,
                          Trend => Secular_Trend);  -- D.LT GEM.LTE.LT0
 
-               -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
+            --  add a portion of the impulse back in
+            for I in First .. Last loop
+                Model(I).Value := Model(I).Value + D.B.IR*Impulses(I).Value;
+            end loop;
+
+            Model := Annual_Add(Model);
+
          end if;
 
          if Filter9Pt > 0 then
@@ -563,6 +605,7 @@ package body GEM.LTE.Primitives.Solution is
                Model := Filter9Point(Model);
             end loop;
          else
+            -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
             Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
          end if;
 
@@ -652,7 +695,6 @@ package body GEM.LTE.Primitives.Solution is
       if Best_Client = ID then
 
 
-         GEM.LTE.Primitives.Shared.Save(DKeep);
          -- Walker.Dump(Keep); -- Print results of last best evaluation,
          GEM.LTE.Primitives.Shared.Dump(DKeep);
 
@@ -669,6 +711,9 @@ package body GEM.LTE.Primitives.Solution is
             Put(M(I), ", ");  --D.B.LT
             Put(MAP(I).Amplitude, ", "); --D.A.LTAP
             Put(MAP(I).Phase, Integer(M(I)/M(NM))'Img, NL);
+            if I-NM <= DKeep.C'Last then
+               DKeep.C(I-NM) := Integer(M(I)/M(NM));
+            end if;
          end loop;
 
          --  if Is_Minimum_Entropy then --  and not MLR_On then
@@ -680,6 +725,7 @@ package body GEM.LTE.Primitives.Solution is
          --                  Trend => Secular_Trend);
          --  end if;
 
+         GEM.LTE.Primitives.Shared.Save(DKeep);
          Save(KeepModel, Data_Records, Forcing);    -- saves to file
          if Split_Training then
             Put_CC(CorrCoeff, CorrCoeffTest, Counter, ID);

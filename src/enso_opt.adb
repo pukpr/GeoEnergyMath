@@ -4,11 +4,13 @@ with GEM.LTE.Primitives.Solution;
 with GEM.LTE.Primitives.Shared;
 with Text_IO;
 with GEM.dLOD;
+with GNAT.OS_Lib;
 
 procedure ENSO_Opt is
    N :  Positive := System.Task_Info.Number_Of_Processors;
    Ch : Character;
    Avail : Boolean;
+
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
      (NLP => GEM.LTE.LP'Length,
@@ -29,11 +31,22 @@ procedure ENSO_Opt is
          bg     => 0.0,
          ImpA   => 1.0, -- 9.0
          ImpB   => 0.0, ---9.0,
+         impC  =>  0.0,
+         delA  =>  0.0,
+         delB  =>  0.0,
+         asym  =>  0.0,
+         ann1  =>  0.0,
+         ann2  =>  0.0,
+         sem1  =>  0.0,
+         sem2  =>  0.0,
+         year  =>  0.0,
+         ir    =>  0.0,
          mA     => 0.0,
          mP     => 0.0,
          shiftT => 0.00000,
-         init   => 0.0063)
-        );
+         init   => 0.0063),
+      C => (others => 0)
+     );
 
    -- Ref : GEM.LTE.Long_Periods_Amp_Phase := GEM.LTE.LPAP;
 begin
@@ -96,6 +109,9 @@ begin
       if Avail then
          if Ch = 'q' then
             GEM.LTE.Primitives.Stop;
+         elsif Ch = 'x' then
+            Text_IO.Put_Line("Exiting, no save");
+            Gnat.Os_Lib.Os_Exit(0);
          end if;
       end if;
       exit when GEM.LTE.Primitives.Halted;

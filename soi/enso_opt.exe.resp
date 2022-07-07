@@ -3,39 +3,44 @@ ALIAS                          FALSE
 CAL                            FALSE
 CLIMATE_INDEX                  soi.dat
 DLOD_REF                       TRUE
-FILTER                         0.33
-FLIP                           0.01
+FILTER                         0.01
+FLIP                           -0.001
 FORCING                        FALSE
 FSTEP                          0.18
-IMPA                           3
+F9                             0
+IMPA                           9.03
 IMPB                           9
 IMPC                           -1
 IMPD                           -1
 IMPULSE                        DELTA
 IR                             0.0
-MAXH                           100
+MAXH                           1000
 MAXLOOPS                       100000
 MERMS                          FALSE
 METRIC                         CC
 MLR                            FALSE
-NH                             "5 10 15 25 190"
+NH                             "1 1 1 1"
 NM                             1
 PARETO                         FALSE
 RESET                          FALSE
 SAMPLING                       12.0
 SCALING                        1.0
-SIMPOW                         3
+SINPOW                         0
 SPLIT_LOW                      FALSE
 SPLIT_TRAINING                 FALSE
 SPREAD_CYCLE                   1000.0
-SPREAD_MIN                     0.0000001
-SPREAD_MAX                     0.1
+SPREAD_MIN                     0.0000000001
+SPREAD_MAX                     0.15
 STARTING_METRIC                0.001
 STEP                           TRUE
 THRESHOLD                      99
 THRESHOLD_ACTION               CATCHUP
-TRAIN_END                      2010
-TRAIN_START                    1890
-TREND                          TRUE
+TRAIN_END                      2000
+TRAIN_START                    1900
+TREND                          FALSE
 YEAR                           0.00100001
-OFFSET                         0.25
+-IMPAVALUE                      9.03
+-IMPBVALUE                      0.25
+-BG                             55.0
+
+

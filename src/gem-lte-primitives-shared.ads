@@ -1,6 +1,8 @@
 
 package GEM.LTE.Primitives.Shared is
 
+   Max_Harmonics : constant := 20;
+
    type Param_A (NLP, NLT : Integer) is
       record
          k0     : Long_Float;
@@ -10,24 +12,27 @@ package GEM.LTE.Primitives.Shared is
       end record;
 
    type Param_B (NLP, NLT : Integer) is
-      record
-         Offset : Long_Float;   -- Random walk values
-         bg     : Long_Float;
-         ImpA   : Long_Float;
-         ImpB   : Long_Float;
-         --ImpC   : Long_Float;
-         --ImpD   : Long_Float;
+      record                    -- Random walk values
+         Offset : Long_Float;   -- Integrated trend on forcing
+         bg     : Long_Float;   -- Background of impulse
+         ImpA   : Long_Float;   -- Amplitude of sin impulse
+         ImpB   : Long_Float;   -- Phase of sin impulse
+         ImpC   : Long_Float;   -- Power of sin impulse
+         DelA   : Long_Float;   -- Amp of delta impulse
+         DelB   : Long_Float;   -- Phase of delta impulse
+         Asym   : Long_Float;   -- Asymmetry of semi-annual impulse
 
-         mA     : Long_Float;
-         mP     : Long_Float;
-         --mD     : Long_Float;
-         shiftT : Long_Float;
-         --fB     : Long_Float;
-         --fC     : Long_Float;
-         --fA     : Long_Float;
-         init   : Long_Float;
-         --order2 : Long_Float;
-         --order3 : Long_Float;
+         Ann1   : Long_Float;   -- Amplitude annual
+         Ann2   : Long_Float;   -- Phase annual
+         Sem1   : Long_Float;   -- Amplitude semi-annual
+         Sem2   : Long_Float;   -- Phase semi-annual
+         IR     : Long_Float;   -- Impulse pass-through
+         Year   : Long_Float;   -- Year correction (in days)
+
+         mA     : Long_Float;   -- 1st order response
+         mP     : Long_Float;   -- 2nd order response
+         shiftT : Long_Float;   -- Starting time correction
+         init   : Long_Float;   -- Initial value
 
          LPAP   : Long_Periods_Amp_Phase(1..NLP);
          LT     : Modulations(1..NLT);
@@ -42,6 +47,7 @@ package GEM.LTE.Primitives.Shared is
       record
          A : Param_A(NLP, NLT);
          B : Param_B(NLP, NLT);
+         C : NS(1..Max_Harmonics) := (others => 0);
       end record;
 
 
