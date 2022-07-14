@@ -341,11 +341,21 @@ package body GEM.LTE.Primitives.Solution is
          Trunc : Integer := Integer((Time - Long_Float'Floor(Time))*Sampling_Per_Year);
          DPos : Integer := Integer(D.B.delB*Long_Float(Sampling_Per_Year));
          Other_Half : Integer := Integer(Sampling_Per_Year/2.0);
+         First_Quarter : Integer := Other_Half/2;
+         Third_Quarter : Integer := Other_Half + Other_Half/2;
       begin
          if Trunc = DPos then
             Value := 1.0;
          elsif Trunc = DPos + Other_Half then
             Value := -1.0; -- delta on inverse
+         elsif Sin_Power = 2 then
+            if Trunc = DPos + First_Quarter then
+               Value := D.B.ImpA;
+            elsif Trunc = DPos + Third_Quarter then
+               Value := D.B.ImpB;
+            else
+               Value := 0.0;
+            end if;
          else
             Value := 0.0;
          end if;
@@ -367,9 +377,13 @@ package body GEM.LTE.Primitives.Solution is
             -- using the impA & impB env vars as odd & even powers, since they won't be used for impulse
             -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
          Value := COS(2.0*Pi*(Time+D.B.ImpB));
-         if Sin_Power > 0 then
+         if Sin_Power = 1 then
             --Value :=  D.B.ImpA*Value**Sin_Power;
             Value := D.B.ImpA*(abs(Value))**(D.B.bg); -- all positive
+         elsif Sin_Power = 2 then
+            Value := COS(4.0*Pi*(Time+D.B.ImpB/2.0));
+            Value := D.B.delA * Impulse_Delta(Time) +
+                     D.B.ImpA*Value*(abs(Value))**(D.B.ImpC-1.0);
          elsif Sin_Power < 0 then
             Value := D.B.ImpA*Value*(abs(Value))**(D.B.ImpC-1.0);
          else

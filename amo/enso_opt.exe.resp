@@ -3,8 +3,8 @@ ALIAS                          FALSE
 CAL                            FALSE
 CLIMATE_INDEX                  amo.dat
 DLOD_REF                       TRUE
-FILTER                         0.33
-FLIP                           0.001
+FILTER                         0.01
+FLIP                           -0.1
 FORCING                        FALSE
 FSTEP                          1
 IMPA                           3
@@ -13,12 +13,12 @@ IMPC                           -1
 IMPD                           -1
 IMPULSE                        DELTA
 IR                             0.0
-MAXH                           100
+MAXH                           1000
 MAXLOOPS                       100000
 MERMS                          FALSE
 METRIC                         CC
 MLR                            FALSE
-NH                             "3 196 61 25 30 35"
+NH                             "3 196 61 25 30 35 1100 7700 22000"
 NM                             1
 PARETO                         FALSE
 RESET                          FALSE

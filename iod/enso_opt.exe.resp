@@ -3,7 +3,7 @@ ALIAS                          FALSE
 CAL                            FALSE
 CLIMATE_INDEX                  iod.dat
 DLOD_REF                       TRUE
-FILTER                         0.33
+FILTER                         0.2
 FLIP                           0.001
 FORCING                        FALSE
 FSTEP                          1
@@ -13,23 +13,24 @@ IMPC                           -1
 IMPD                           -1
 IMPULSE                        DELTA
 IR                             0.0
-MAXH                           100
+MAXH                           1000
 MAXLOOPS                       100000
 MERMS                          FALSE
 METRIC                         CC
 MLR                            FALSE
-NH                             "5 10 1525 30 35 40 45 70 80 95"
+NH                             "1 1 1 1 1 1 1 1 1 1"
+NH1                             "5 10 1525 30 35 40 45 70 80 95 9500"
 NM                             1
 PARETO                         FALSE
 RESET                          FALSE
 SAMPLING                       12.0
 SCALING                        1.0
-SINPOW                         0
+SINPOW                         2
 SPLIT_LOW                      FALSE
 SPLIT_TRAINING                 FALSE
 SPREAD_CYCLE                   1000.0
-SPREAD_MIN                     0.0000001
-SPREAD_MAX                     0.1
+SPREAD_MIN                     0.000000001
+SPREAD_MAX                     0.5
 STARTING_METRIC                0.001
 STEP                           TRUE
 THRESHOLD                      99
