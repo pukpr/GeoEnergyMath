@@ -11,7 +11,7 @@ The compiled executable is located in an obj subdirectory.  The obj subdirectory
 
 > obj/enso_opt
 
-More recently have created individual subbdirectories -- copy the executable in to a specific directory and run with e.g. *enso_opt r*, where r means to read from the par file associated with that exec, ==enso_opt.exe.par==.  These are all preconfigured now to create optimal test cases to evaluate against.
+More recently have created individual subbdirectories -- copy the executable in to a specific directory and run with e.g. *enso_opt r*, where *r* means to read from the par file associated with that exec, *enso_opt.exe.par*.  These are all preconfigured now to create optimal test cases to evaluate against.
 
 I use DOS, Linux, or mingw to run the execs, but DOS has a responsive keyboard interrupt so I prefer to use DOS to run and keep a mingw shell to do other commands.  Pressing 'q' will stop and save the sim results, while pressing 'x' will exit the process without saving.
 
