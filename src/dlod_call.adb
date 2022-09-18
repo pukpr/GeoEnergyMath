@@ -1,12 +1,15 @@
 with Text_IO;
 with GEM.LTE;
 with GEM.dLOD;
+with Ada.Command_Line;
 
 procedure dLOD_Call is
 begin
 
    declare
-      DBLTAP : Gem.LTE.Long_Periods_Amp_Phase  :=  GEM.dLOD("dlod3.dat");
+      Name : constant String := Ada.Command_Line.Argument(1);
+      -- "dlod3.dat"
+      DBLTAP : Gem.LTE.Long_Periods_Amp_Phase  :=  GEM.dLOD(Name);
    begin
       null;
    end;

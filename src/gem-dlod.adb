@@ -33,8 +33,8 @@ begin
 
    Trend := 0.0;
    Regression_Factors (Data_Records => D, -- Time series
-                       First => First,
-                       Last => Last,  -- Training Interval
+                       --First => First,
+                       --Last => Last,  -- Training Interval
                        Forcing => Forcing,  -- Value @ Time
                        NM => DBLT'Last, -- # modulations
                        DBLT => DBLT, --D.B.LT,

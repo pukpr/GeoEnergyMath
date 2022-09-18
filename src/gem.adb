@@ -6,7 +6,7 @@ with Ada.Long_Float_Text_IO;
 
 package body GEM is
 
-   type Options is (ALIAS, CAL, CLIMATE_INDEX, DLOD_REF, EVERY, FILTER, FLIP, FORCING,
+   type Options is (ALIAS, EXCLUDE, CLIMATE_INDEX, DLOD_REF, EVERY, FILTER, FLIP, FORCING,
                     FSTEP, IMPA, IMPB, IMPC, IMPD, IMPULSE, IR, MAXH, MAXLOOPS,
                     MERMS, METRIC, MLR, NH, NM, PARETO, RESET, SAMPLING,
                     SCALING, SINPOW, SPLIT_LOW, SPLIT_TRAINING, SPREAD_CYCLE,

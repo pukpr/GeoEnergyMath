@@ -305,9 +305,9 @@ package body GEM.LTE.Primitives is
    end RMS;
 
    Pi : constant Long_Float := Ada.Numerics.Pi;
-   Mult : constant Long_Float := 1.003;  -- 1.006 1.012 1.02 --1.05
+   Mult : constant Long_Float := 1.006;  -- 1.003 1.012 1.02 --1.05
    Step : constant Long_Float := GEM.Getenv("FSTEP", 0.18); -- 0.04  -- 0.02  ==0.18
-   F_Start : constant Long_Float := 0.3; -- 0.3; -- 0.01; --1.0
+   F_Start : constant Long_Float := 0.1; -- 0.3; -- 0.01; --1.0
    F_End : constant Long_Float := 1000.0;
 
    function Min_Entropy_RMS (X, Y : in Data_Pairs) return Long_Float is
@@ -648,7 +648,7 @@ package body GEM.LTE.Primitives is
 
 
    procedure Regression_Factors (Data_Records : in Data_Pairs;
-                                 First, Last,  -- Training Interval
+                                 --First, Last,  -- Training Interval
                                  NM : in Positive; -- # modulations
                                  Forcing : in Data_Pairs;  -- Value @ Time
                                  -- Factors_Matrix : in out Matrix;
@@ -660,6 +660,8 @@ package body GEM.LTE.Primitives is
                                  Singular : out Boolean) is
 
       use Ada.Numerics.Long_Elementary_Functions;
+      First : Integer := Data_Records'First;
+      Last : Integer := Data_Records'Last;
       Pi : Long_Float := Ada.Numerics.Pi;
       Trend : Boolean := Secular_Trend > 0.0;
       -- Add_Trend : Integer := Integer(Secular_Trend);

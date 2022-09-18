@@ -313,7 +313,7 @@ package body GEM.LTE.Primitives.Solution is
       Filter : constant Long_Float := GEM.Getenv("FILTER", 0.33333333);
       MLR_On : constant Boolean := GEM.Getenv("MLR", FALSE); -- wrong name
       Forcing_Only : constant Boolean := GEM.Getenv("FORCING", FALSE);
-      Calibrate : constant Boolean :=  GEM.Getenv("CAL", FALSE);
+      Exclude : constant Boolean :=  GEM.Getenv("EXCLUDE", FALSE);
       Pareto : constant Boolean :=  GEM.Getenv("PARETO", FALSE);
       Filter9Pt : constant Integer :=  GEM.Getenv("F9", 0);
       Climate_Trend : constant Boolean := GEM.Getenv("TREND", FALSE);
@@ -379,7 +379,7 @@ package body GEM.LTE.Primitives.Solution is
          Value := COS(2.0*Pi*(Time+D.B.ImpB));
          if Sin_Power = 1 then
             --Value :=  D.B.ImpA*Value**Sin_Power;
-            Value := D.B.ImpA*(abs(Value))**(D.B.bg); -- all positive
+            Value := D.B.ImpA*(abs(Value))**(D.B.ImpC); -- all positive
          elsif Sin_Power = 2 then
             Value := COS(4.0*Pi*(Time+D.B.ImpB/2.0));
             Value := D.B.delA * Impulse_Delta(Time) +
@@ -443,7 +443,6 @@ package body GEM.LTE.Primitives.Solution is
       CorrCoeffTest, Old_CCTest : Long_Float := 0.0;
       Progress_Cycle, Spread : Long_Float;
       Counter : Long_Integer := -1;
-      Init_Keep : Long_Float;
 
       function Find_Index (Time : in Long_Float) return Integer is
          Index : Integer;
@@ -461,6 +460,45 @@ package body GEM.LTE.Primitives.Solution is
       First : Integer := Find_Index (TS); -- Data_Records'First+12;
       Last : Integer := Find_Index (TE); -- Data_Records'Last-12;
       Mid : Integer := (First+Last)/2;
+
+      function Exclude_Metric return Long_Float is
+        X : Data_Pairs := Model(Model'First..First) & Model(Last..Model'Last);
+        Y : Data_Pairs := Data_Records(Data_Records'First..First) & Data_Records(Last .. Data_Records'Last);
+        Z : Data_Pairs := Forcing(Forcing'First..First) & Forcing(Last..Forcing'Last);
+      begin
+          return Metric( X, Y, Z);
+      end Exclude_Metric;
+
+      --  function Regression_Data return Data_Pairs is
+      --     D0 : Data_Pairs := Data_Records(First .. Last);
+      --     D1 : Data_Pairs := Data_Records(Data_Records'First .. First) & Data_Records(Last .. Data_Records'Last);
+      --  begin
+      --     if Exclude then
+      --        return D1;
+      --     else
+      --        return D0;
+      --     end if;
+      --  end Regression_Data;
+      --
+      --  function Forcing_Model return Data_Pairs is
+      --     F0 : Data_Pairs := Forcing(First .. Last);
+      --     F1 : Data_Pairs := Forcing(Forcing'First .. First) & Forcing(Last .. Forcing'Last);
+      --  begin
+      --     if Exclude then
+      --        return F1;
+      --     else
+      --        return F0;
+      --     end if;
+      --  end Forcing_Model;
+      --
+      function Excluded (D : Data_Pairs) return Data_Pairs is
+      begin
+         if Exclude then
+            return D(D'First .. First) & D(Last .. D'Last);
+         else
+            return D(First .. Last);
+         end if;
+      end Excluded;
 
       Max_Harmonics : Positive := GEM.Getenv("MAXH", 1000);
 
@@ -534,7 +572,7 @@ package body GEM.LTE.Primitives.Solution is
 
          der := 1.0 - D.B.mA - D.B.mP; -- keeps the integrator stable
 
-         -- GEM.LTE.Year_Adjustment(D.B.Year, D.A.LP); -- should be a protected call?
+         GEM.LTE.Year_Adjustment(D.B.Year, D.A.LP); -- should be a protected call?
 
          Impulses := Impulse_Amplify(
                             Raw     => Tide_Sum(Template     => Data_Records,
@@ -551,6 +589,7 @@ package body GEM.LTE.Primitives.Solution is
          Forcing := IIR( Raw => Impulses,
                          lagA => der, lagB => D.B.mA, lagC => D.B.mP,
                          iA => D.B.init, iB => 0.0, iC => 0.0, Start => 0.0*(TS-(Ref_Time + D.B.ShiftT)));
+                         --iA => D.B.init, iB => 0.0, iC => 0.0, Start => 0.0*(TS-(Ref_Time + D.B.ShiftT)));
 
          --  --  add a portion of the impulse back in
          --  for I in First .. Last loop
@@ -568,10 +607,10 @@ package body GEM.LTE.Primitives.Solution is
               else
                  Secular_Trend := 0.0;
               end if;
-              Regression_Factors (Data_Records => Data_Records, -- Time series
-                                  First => First,
-                                  Last => Last,  -- Training Interval
-                                  Forcing => Forcing,  -- Value @ Time
+              Regression_Factors (Data_Records => Excluded(Data_Records), -- Time series
+                                  --First => First,
+                                  --Last => Last,  -- Training Interval
+                                  Forcing => Excluded(Forcing),  -- Value @ Time
                                   NM => NM + NH, -- # modulations
                                   DBLT => M, --D.B.LT,
                                   DALTAP => MAP, --D.A.LTAP,
@@ -606,7 +645,7 @@ package body GEM.LTE.Primitives.Solution is
                          Trend => Secular_Trend);  -- D.LT GEM.LTE.LT0
 
             --  add a portion of the impulse back in
-            for I in First .. Last loop
+            for I in Model'Range loop
                 Model(I).Value := Model(I).Value + D.B.IR*Impulses(I).Value;
             end loop;
 
@@ -634,7 +673,11 @@ package body GEM.LTE.Primitives.Solution is
                CorrCoeff := Metric( Model(Mid..Last), Data_Records(Mid..Last), Forcing(Mid..Last));
             end if;
          else
-            CorrCoeffP := Metric( Model(First..Last), Data_Records(First..Last), Forcing(First..Last));
+            if Exclude then
+               CorrCoeffP := Exclude_Metric; -- ( Model(First..Last), Data_Records(First..Last), Forcing(First..Last));
+            else
+               CorrCoeffP := Metric( Model(First..Last), Data_Records(First..Last), Forcing(First..Last));
+            end if;
          end if;
 
          CorrCoeff := CorrCoeffP/Long_Float(Pareto_Index) + CorrCoeff;
@@ -693,16 +736,11 @@ package body GEM.LTE.Primitives.Solution is
          else
             Spread := Spread_Min + Spread_Max*(1.0-LEF.Cos(Progress_Cycle/Spread_Cycle));
          end if;
-         if Calibrate then
-            Walker.Markov(D.B.Init, Init_Keep, Spread);
-            Walker.Markov(D.B.shiftT, Init_Keep, Spread);
-         else
-            Walker.Markov(Set, Keep, Spread);
-            Walker.Random_Harmonic(Harms, Harms_Keep);
---            for I in Harms'Range loop
---               Walker.Random_Harmonic(Harms(I), Harms_Keep(I));
---            end loop;
-         end if;
+         Walker.Markov(Set, Keep, Spread);
+         Walker.Random_Harmonic(Harms, Harms_Keep);
+--       for I in Harms'Range loop
+--           Walker.Random_Harmonic(Harms(I), Harms_Keep(I));
+--       end loop;
 
       end loop;
       Monitor.Stop;

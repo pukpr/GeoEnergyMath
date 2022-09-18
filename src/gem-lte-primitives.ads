@@ -57,7 +57,7 @@ package GEM.LTE.Primitives is
 
 
    procedure Regression_Factors (Data_Records : in Data_Pairs;  -- Time series
-                                 First, Last,  -- Training Interval
+                                 --First, Last,  -- Training Interval
                                  NM : in Positive; -- # modulations
                                  Forcing : in Data_Pairs;  -- Value @ Time
                                  -- Factors_Matrix : in out Matrix;
