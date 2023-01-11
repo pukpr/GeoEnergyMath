@@ -137,9 +137,9 @@ package body GEM.LTE.Primitives.Shared is
       Create(FT, Out_File, FN);
       Write(FT, P);
       Close(FT);
-      if GEM.Command_Line_Option_Exists("r") then
-         Write(P);
-      end if;
+      --if GEM.Command_Line_Option_Exists("r") then
+      Write(P);
+      --end if;
       -- Server.Put (P);
    end Save;
 
@@ -240,27 +240,32 @@ package body GEM.LTE.Primitives.Shared is
       use DIO;
       FT : File_Type;
    begin
-      begin
-         Open(FT, In_File, FN);
-         Read (FT, P);
-         Close (FT);
-      exception
-         when Name_Error =>
-            Ada.Text_IO.Put_Line ("No PARMS file: " & FN);
-         when others =>
-            Ada.Text_IO.Put_Line ("Error:" & FN);
-            if Is_Open(FT) then
-               Close(FT);
-            end if;
-      end;
+      if GEM.Command_Line_Option_Exists("l") then  -- legacy file
+         begin
+            Open(FT, In_File, FN);
+            Read (FT, P);
+            Close (FT);
+         exception
+            when Name_Error =>
+               Ada.Text_IO.Put_Line ("No PARMS file: " & FN);
+            when others =>
+               Ada.Text_IO.Put_Line ("Error:" & FN);
+               if Is_Open(FT) then
+                  Close(FT);
+               end if;
+         end;
+      else
+         Read(P);
+      end if;
+
       if GEM.Command_Line_Option_Exists("p") then
          Dump(P);
          GNAT.OS_Lib.Os_Exit(0);
       elsif GEM.Command_Line_Option_Exists("w") then
          Write(P);
          GNAT.OS_Lib.Os_Exit(0);
-      elsif GEM.Command_Line_Option_Exists("r") then
-         Read(P);
+      --elsif GEM.Command_Line_Option_Exists("r") then
+      --   Read(P);
       end if;
    end Load;
 
@@ -290,10 +295,10 @@ package body GEM.LTE.Primitives.Shared is
             Put(D.B.LPAP(I).Amplitude, ", ");
             Put(D.B.LPAP(I).Phase, I'Img, NL);
          end loop;
-         Ada.Text_IO.Put_Line("---- LTE static ----");
-         for I in D.B.LT'Range loop
-            Put(D.B.LT(I), "", NL);
-         end loop;
+         --Ada.Text_IO.Put_Line("---- LTE static ----");
+         --for I in D.B.LT'Range loop
+         --   Put(D.B.LT(I), "", NL);
+         --end loop;
    end Dump;
 
 end GEM.LTE.Primitives.Shared;

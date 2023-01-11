@@ -12,6 +12,8 @@ package body GEM.LTE.Primitives is
    Min_Entropy : constant Boolean := GEM.Getenv("METRIC", "") = "ME";
    Linear_Step : constant Boolean := GEM.Getenv("STEP", FALSE);
    Every_N_Line : constant Integer := GEM.Getenv("EVERY", 1);
+   Magnify : constant Integer := GEM.Getenv("MAG", 1);
+   Clip : constant LONG_FLOAT := GEM.Getenv("CLIP", 0.0);
 
 
    function Is_Minimum_Entropy return Boolean is
@@ -32,6 +34,25 @@ package body GEM.LTE.Primitives is
       end loop;
       return Res;
    end Reduce;
+
+   function Expand (Raw : in Data_Pairs; -- Raw starts with line 1
+                    Mag : in Positive) return Data_Pairs is
+      Res : Data_Pairs(1..Raw'Length*Mag) := (others => (0.0, 0.0));
+      Stride : Integer := 1;
+   begin
+      for I in Raw'First .. Raw'Last-1 loop
+         for J in 0 .. Mag-1 loop
+            Res(Stride+J).Value := Raw(I).Value +
+              (Raw(I+1).Value-Raw(I).Value)*Long_Float(J)/Long_Float(Mag);
+            Res(Stride+J).Date := Raw(I).Date +
+              (Raw(I+1).Date-Raw(I).Date)*Long_Float(J)/Long_Float(Mag);
+         end loop;
+         Stride := Stride + Mag;
+      end loop;
+      Res(Raw'Length*Mag).Value := Raw(Raw'Last).Value;
+      Res(Raw'Length*Mag).Date := Raw(Raw'Last).Date;
+      return Res;
+   end Expand;
 
    function File_Lines (Name : String) return Integer is
       Data  : Text_IO.File_Type;
@@ -58,6 +79,7 @@ package body GEM.LTE.Primitives is
       Data                  : Text_IO.File_Type;
       Date, Value           : Long_Float;
       Arr                   : Data_Pairs(1..Lines);
+      Val : Long_Float;
    begin
       Text_IO.Open(File => Data,
                    Mode => Text_IO.In_File,
@@ -67,7 +89,18 @@ package body GEM.LTE.Primitives is
          Ada.Long_Float_Text_IO.Get(File => Data, Item => Value);
          Text_IO.Skip_Line(Data);
          -- Text_IO.Put_Line(Date'Img & " " & Value'Img);
-         Arr(I) := (Date, Value);
+         if Clip > 0.0 then
+            if Value > Clip then
+               Val := Clip;
+            elsif Value < -Clip then
+               Val := -Clip;
+            else
+               Val := Value;
+            end if;
+            Arr(I) := (Date, Val);
+         else
+            Arr(I) := (Date, Value);
+         end if;
       end loop;
       Text_IO.Close(File => Data);
       if Every_N_Line = 1 then
@@ -105,7 +138,8 @@ package body GEM.LTE.Primitives is
          Res(I).Value := Raw(I-1).Value
            + lagA*Res(I-1).Value
            + lagB*Res(I-2).Value
-           + lagC*Res(I-3).Value;
+           -- + lagC*Res(I-3).Value;
+           - Long_Float'Copy_Sign(lagC, Res(I-1).Value);
       end loop;
       -- Backwards integration
       --  for I in reverse Raw'First .. Start_Index-1 loop
@@ -117,7 +151,8 @@ package body GEM.LTE.Primitives is
          Res(I).Value := Raw(I-1).Value
            + lagA*Res(I-1).Value
            + lagB*Res(I-2).Value
-           + lagC*Res(I-3).Value;
+           -- + lagC*Res(I-3).Value;
+           + Long_Float'Copy_Sign(lagC, Res(I-1).Value);
       end loop;
       return Res;
    end IIR;
@@ -196,7 +231,8 @@ package body GEM.LTE.Primitives is
    function LTE (Forcing : in Data_Pairs;
                  Wave_Numbers : in Modulations;
                  Amp_Phase : in Modulations_Amp_Phase;
-                 Offset, K0, Trend : in Long_Float := 0.0) return Data_Pairs is
+                 Offset, K0, Trend, Accel : in Long_Float := 0.0;
+                 NonLin : in Long_Float := 1.0) return Data_Pairs is
       Res : Data_Pairs := Forcing;
    begin
       for I in Forcing'Range loop
@@ -208,14 +244,22 @@ package body GEM.LTE.Primitives is
             for J in Wave_Numbers'Range loop
                declare
                   M : GEM.LTE.Amp_Phase renames Amp_Phase(J);
+                  SW : Long_Float;
                begin
-                  LF := LF + M.Amplitude*Sin(2.0*Pi*Wave_Numbers(J)*Res(I).Value + M.Phase);
+                  SW := Sin(2.0*Pi*Wave_Numbers(J)*Res(I).Value + M.Phase);
+                  if SW < 0.0 then
+                     SW := -(abs SW) ** NonLin;
+                  else
+                     SW := SW ** NonLin;
+                  end if;
+                  LF := LF + M.Amplitude*SW;
                exception
                   when Constraint_Error =>
                      null;
                end;
             end loop;
-            LF := LF + Offset + K0*Res(I).Value + Trend*Res(I).Date; -- K0 is wavenumber=0 solution
+            LF := LF + Offset + K0*Res(I).Value + Trend*Res(I).Date
+               + Accel*(Res(I).Date-Res(Forcing'First).Date)**2.0; -- K0 is wavenumber=0 solution
             Res(I).Value := LF;
          end;
       end loop;
@@ -288,6 +332,7 @@ package body GEM.LTE.Primitives is
       return sum_XY / sum_absXY;
    end Xing;
 
+
   function RMS (X, Y : in Data_Pairs;
                 Ref, Offset : in Long_Float) return Long_Float is
       N : Integer := X'Length;
@@ -305,9 +350,9 @@ package body GEM.LTE.Primitives is
    end RMS;
 
    Pi : constant Long_Float := Ada.Numerics.Pi;
-   Mult : constant Long_Float := 1.006;  -- 1.003 1.012 1.02 --1.05
+   Mult : constant Long_Float := GEM.Getenv("FMULT", 1.006);  -- 1.003 1.012 1.02 --1.05
    Step : constant Long_Float := GEM.Getenv("FSTEP", 0.18); -- 0.04  -- 0.02  ==0.18
-   F_Start : constant Long_Float := 0.1; -- 0.3; -- 0.01; --1.0
+   F_Start : constant Long_Float := GEM.Getenv("FSTART", 0.1); -- 0.3; -- 0.01; --1.0
    F_End : constant Long_Float := 1000.0;
 
    function Min_Entropy_RMS (X, Y : in Data_Pairs) return Long_Float is
@@ -465,6 +510,19 @@ package body GEM.LTE.Primitives is
       end if;
    end Min_Entropy_Power_Spectrum;
 
+   function FT_CC (Model, Data, Forcing : in Data_Pairs) return LONG_FLOAT is
+      Model_S : Data_Pairs := Model;
+      Data_S : Data_Pairs := Data;
+      RMS : LONG_FLOAT;
+   begin
+      ME_Power_Spectrum (Forcing=>Forcing, Model=>Model, Data=>Data,
+                         Model_Spectrum=>Model_S, Data_Spectrum=>Data_S,
+                         RMS => RMS);
+      Model_S := Window(Model_S,2);
+      Data_S := Window(Data_S,2);
+      return CC(Model_S, Data_S);
+   end FT_CC;
+
 
    --
    procedure Dump (Model, Data : in Data_Pairs;
@@ -489,12 +547,21 @@ package body GEM.LTE.Primitives is
       return not Running;
    end Halted;
 
+   procedure Continue is
+   begin
+      Running := TRUE;
+   end Continue;
+
+
    --
    -- protect the file from reentrancy
    --
 
    protected Safe is
       procedure Save (Model, Data, Forcing : in Data_Pairs;
+                      File_Name : in String);
+      procedure Save (Model : in Data_Pairs;
+                      Mag : in Integer;
                       File_Name : in String);
    end Safe;
 
@@ -507,6 +574,7 @@ package body GEM.LTE.Primitives is
          RMS : LONG_FLOAT;
       begin
          Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
+         if Model_S'Length < 10_000 then
          if Is_Minimum_Entropy then
             ME_Power_Spectrum (Forcing=>Model, Model=>Forcing, Data=>Data,
                                Model_Spectrum=>Model_S, Data_Spectrum=>Data_S,
@@ -517,6 +585,7 @@ package body GEM.LTE.Primitives is
                                RMS => RMS);
             Model_S := Window(Model_S,2);
             Data_S := Window(Data_S,2);
+            end if;
          end if;
          for I in Data'Range loop
             Text_IO.Put_Line(FT, Data(I).Date'Img & ", " & Model(I).Value'Img &
@@ -526,12 +595,29 @@ package body GEM.LTE.Primitives is
          end loop;
          Text_IO.Close(FT);
       end Save;
+
+      procedure Save (Model : in Data_Pairs;
+                      Mag : in Integer;
+                      File_Name : in String) is
+         FT : Text_IO.File_Type;
+         Model_S : Data_Pairs := Expand (Model, Mag);
+      begin
+         if Mag > 1 then
+            Text_IO.Create(File => FT, Name=>File_Name, Mode=>Text_IO.Out_File);
+            for I in Model_S'Range loop
+               Text_IO.Put_Line(FT, Model_S(I).Date'Img & ", " & Model_S(I).Value'Img );
+            end loop;
+            Text_IO.Close(FT);
+         end if;
+      end Save;
    end Safe;
+
 
    procedure Save (Model, Data, Forcing : in Data_Pairs;
                    File_Name : in String := "lte_results.csv") is
    begin
       Safe.Save(Model,Data, Forcing, File_Name);
+      Safe.Save(Forcing, Magnify, "mag_" & File_Name);
    end Save;
 
    -- 3 point median
@@ -657,6 +743,7 @@ package body GEM.LTE.Primitives is
                                  DALEVEL : out Long_Float;
                                  DAK0 : out Long_Float;
                                  Secular_Trend : in out Long_Float;
+                                 Accel : out Long_Float;
                                  Singular : out Boolean) is
 
       use Ada.Numerics.Long_Elementary_Functions;
@@ -665,7 +752,7 @@ package body GEM.LTE.Primitives is
       Pi : Long_Float := Ada.Numerics.Pi;
       Trend : Boolean := Secular_Trend > 0.0;
       -- Add_Trend : Integer := Integer(Secular_Trend);
-      Add_Trend : Integer := Boolean'Pos(Trend);
+      Add_Trend : Integer := 2*Boolean'Pos(Trend);
       Num_Coefficients : constant Integer := 2 + NM*2 + Add_Trend; -- !!! sin + cos mod
       RData : Vector (1 .. Last-First+1);
       Factors_Matrix : Matrix (1 .. Last-First+1, 1 .. Num_Coefficients);
@@ -679,7 +766,8 @@ package body GEM.LTE.Primitives is
             Factors_Matrix(I-First+1, 4+(K-1)*2) := Cos(2.0*Pi*DBLT(K) * Forcing(I).Value);
          end loop;
          if Trend then
-            Factors_Matrix(I-First+1, Num_Coefficients) := Forcing(I).Date;
+            Factors_Matrix(I-First+1, Num_Coefficients-1) := Forcing(I).Date;
+            Factors_Matrix(I-First+1, Num_Coefficients) := (Forcing(I).Date-Forcing(First).Date)**2.0;
          end if;
       end loop;
 
@@ -701,9 +789,11 @@ package body GEM.LTE.Primitives is
                K := K+2;
             end loop;
             if Trend then
-               Secular_Trend := Coefficients(Num_Coefficients); --!!!
+               Secular_Trend := Coefficients(Num_Coefficients-1); --!!!
+               Accel := Coefficients(Num_Coefficients); --!!!
             else
                Secular_Trend := 0.0;
+               Accel := 0.0;
             end if;
             Singular := False;
          end if;

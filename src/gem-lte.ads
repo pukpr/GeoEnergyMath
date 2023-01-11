@@ -8,9 +8,14 @@ package GEM.LTE is
    -- The year value is close to the Tropical year of 365.24219 days
    -- which accumulates to ~1/2 day error over 100 years
    -- Year : constant Long_Float := 365.2412384; -- 365.246462;
-   Draconic : constant Long_Float := 27.21222082;
-   Tropical : constant Long_Float := 27.32163237; -- 27.32166155;
-   Anomalistic : constant Long_Float := 27.55454988;
+--   Draconic : constant Long_Float := 27.21222082;
+--   Tropical : constant Long_Float := 27.32163237; -- 27.32166155;
+--   Anomalistic : constant Long_Float := 27.55454988;
+
+   Draconic : constant Long_Float := 27.212_220_815;
+   Tropical : constant Long_Float := 27.321_661_554; -- 27.32166155;
+   Anomalistic : constant Long_Float := 27.554_549_886;
+
 
    N : constant := 1.0/(1.0/Draconic - 1.0/Tropical);
    p : constant := 1.0/(1.0/Tropical - 1.0/Anomalistic);
@@ -52,12 +57,16 @@ package GEM.LTE is
        (3, 0,-1, 0, 0.0),
        (1, 0, 0, 0, 0.0),
        (1, 0, 0, 1, 0.0),
-       (3, 0,-3, 0, 0.0),
+       (3, 0,-3, 0, 0.0), -- (1, 0, 0, 2, 0.0)
        (2,-2, 0, 0, 0.0),
        (1,-2, 1, 0, 0.0),
        (3, -2, 1, 1, 0.0),
        (2, 0, 0, 1, 0.0),
-       (1, 0, 1, 1, 0.0)
+       (1, 0, 1, 1, 0.0),
+
+       (0, 1, 0, 0, 0.0),
+       (0, 2, 0, 0, 0.0),
+       (0, 3, 0, 0, 0.0)
 
        --,(3, -2,-1, 0, 0.0),
        --(5, -2, -1, 0, 0.0),
@@ -68,11 +77,14 @@ package GEM.LTE is
   QBO_Args : Doodson_List :=
      ( (0, 1, 0, 0, 0.0),
        (0, 2, 0, 0, 0.0),
+       (0, 3, 0, 0, 0.0),
        (1, 0, 0, 0, 0.0),
        (2, 0, 0, 0, 0.0),
        (1, 0, 0, 1, 0.0),
        (2, 0,0, 1, 0.0),
-       (2, 0, 0, 2, 0.0)
+       (2, 0, 0, 2, 0.0),
+       (0, 0, 0, 1, 0.0),
+       (1, 0,-1, 0, 0.0)
 
  );
 

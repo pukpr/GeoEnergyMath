@@ -13,7 +13,8 @@ package GEM.LTE.Primitives.Solution is
    procedure Dipole_Model (N_Tides, N_Modulations : in Integer;
                            ID : in Integer := 0;
                            File_Name : in String := "nino34_soi.txt";
-                           Split_Training : in BOOLEAN := FALSE);
+                           Split_Training : in BOOLEAN := FALSE;
+                           Exclude : in BOOLEAN := FALSE);
 
 
    -- Should also add interfaces such as

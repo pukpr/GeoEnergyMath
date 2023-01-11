@@ -12,6 +12,8 @@ package body GEM.Random_Descent is
    subtype Set_Index is Positive range 1..Set_Range;
    package DR is new Ada.Numerics.Discrete_Random(Set_Index);
    Flip_Value : constant Long_Float := GEM.Getenv("FLIP", 0.0);
+   Fix_Harm : constant BOOLEAN := GEM.Getenv("FIX", FALSE);
+   Log_Harm : constant BOOLEAN := GEM.Getenv("LOGH", FALSE);
 
    subtype Harmonic_Index is Positive range 2..Harmonic_Range;
    package HR is new Ada.Numerics.Discrete_Random(Harmonic_Index);
@@ -75,17 +77,21 @@ package body GEM.Random_Descent is
    procedure Random_Harmonic(Index : in out Positive;
                              Ref : out Positive) is
       Ran : Long_Float := Long_Float(FR.Random(G));
+      FV : Long_Float := abs Flip_Value;
    begin
       Ref := Index;
-      if Ran < Flip_Value then
-         if Ran < Flip_Value/2.0 then
-            Index := HR.Random(H);
-         else
+      if Fix_Harm then
+         null;
+      elsif Ran < FV then
+         if Log_Harm then
             Index := 2 - INTEGER(Long_Float(Harmonic_Range)
                                  * LEF.Log(Long_Float(FR.Random(G))));
+         else
+            Index := HR.Random(H);
          end if;
       end if;
    end Random_Harmonic;
+
 
    procedure Random_Harmonic(Index : in out NS;
                              Ref : out NS) is

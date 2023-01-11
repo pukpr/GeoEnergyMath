@@ -27,8 +27,8 @@ package body GEM.LTE is
                               List : in out Periods) is
    begin
       if Value /= 0.0 then
-         --Year_Dynamic_Correction := Value;
-         Year_Correction := Value;
+         Year_Dynamic_Correction := Value;
+         --Year_Correction := Value;
          for I in List'Range loop
             List(I) := Doodson(I, Doodson_Args);
          end loop;

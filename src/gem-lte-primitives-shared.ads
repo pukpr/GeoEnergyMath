@@ -1,7 +1,7 @@
 
 package GEM.LTE.Primitives.Shared is
 
-   Max_Harmonics : constant := 20;
+   Max_Harmonics : constant := 30;
 
    type Param_A (NLP, NLT : Integer) is
       record

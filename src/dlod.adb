@@ -69,7 +69,8 @@ begin
                 Amp_Phase => DBLTAP,
                 Offset => Level,
                 K0 => K0,
-                Trend => 0.0);
+                Trend => 0.0,
+                NonLin => 1.0);
 
    Put(CC(D,Model));
 

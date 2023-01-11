@@ -49,7 +49,8 @@ package GEM.LTE.Primitives is
    function LTE (Forcing : in Data_Pairs;
                  Wave_Numbers : in Modulations;
                  Amp_Phase : in Modulations_Amp_Phase;
-                 Offset, K0, Trend : in Long_Float := 0.0) return Data_Pairs;
+                 Offset, K0, Trend, Accel : in Long_Float := 0.0;
+                 NonLin : in Long_Float := 1.0) return Data_Pairs;
 
    -- Query to determine if a Tidal Constituent value should not be changed
    -- This uses a float comparison and is really only used for tidal periods
@@ -66,6 +67,7 @@ package GEM.LTE.Primitives is
                                  DALEVEL : out Long_Float;
                                  DAK0 : out Long_Float;
                                  Secular_Trend : in out Long_Float;
+                                 Accel : out Long_Float;
                                  Singular : out Boolean);
 
    --
@@ -82,6 +84,9 @@ package GEM.LTE.Primitives is
    function RMS (X, Y : in Data_Pairs;
                  Ref, Offset : in Long_Float) return Long_Float;
 
+   -- Correlation coefficient on spectrum
+   function FT_CC (Model, Data, Forcing : in Data_Pairs) return Long_Float;
+
    -- Minimum Entropy
    function Min_Entropy_Power_Spectrum (X, Y : in Data_Pairs) return Long_Float;
 
@@ -94,6 +99,7 @@ package GEM.LTE.Primitives is
    -- Halts the running threads
    procedure Stop;
    function Halted return Boolean;
+   procedure Continue;
 
    -- 3 point median
    function Median (Raw : in Data_Pairs) return Data_Pairs;

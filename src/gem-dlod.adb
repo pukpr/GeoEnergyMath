@@ -9,10 +9,10 @@ function GEM.dLOD (File_Name : in String) return Gem.LTE.Long_Periods_Amp_Phase 
    Singular : Boolean;
    Forcing : Data_Pairs := D;
    Model : Data_Pairs := D;
-   DBLT : Gem.LTE.Long_Periods := Gem.LTE.LP & (Y, Y/2.0, Y/3.0);
-   DBLTAP : Gem.LTE.Long_Periods_Amp_Phase := Gem.LTE.LPAP &
-         Gem.LTE.Long_Periods_Amp_Phase'((0.0,0.0), (0.0,0.0), (0.0,0.0));
-   Level, K0, Trend : Long_Float;
+   DBLT : Gem.LTE.Long_Periods := Gem.LTE.LP; -- & (Y, Y/2.0, Y/3.0);
+   DBLTAP : Gem.LTE.Long_Periods_Amp_Phase := Gem.LTE.LPAP;
+         -- & Gem.LTE.Long_Periods_Amp_Phase'((0.0,0.0), (0.0,0.0), (0.0,0.0));
+   Level, K0, Trend, Accel : Long_Float := 0.0;
    Last_Time : Long_Float;
 begin
    --DBLT(4) :=  Gem.LTE.LP(9);
@@ -42,6 +42,7 @@ begin
                        DALEVEL => LEVEL,
                        DAK0 => K0,
                        Secular_Trend => Trend,
+                       Accel => Accel,
                        Singular => Singular
                        );
 
@@ -58,7 +59,8 @@ begin
                 Amp_Phase => DBLTAP,
                 Offset => Level,
                 K0 => K0,
-                Trend => 0.0);
+                Trend => 0.0,
+                NonLin => 1.0);
    --  for I in DBLT'Range loop -- to frequency
    --     DBLT(I) := GEM.LTE.Year_Length/DBLT(I);
    --  end loop;

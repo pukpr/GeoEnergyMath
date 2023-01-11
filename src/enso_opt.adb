@@ -5,12 +5,16 @@ with GEM.LTE.Primitives.Shared;
 with Text_IO;
 with GEM.dLOD;
 with GNAT.OS_Lib;
+with Ada.Calendar;
 
 procedure ENSO_Opt is
-   N :  Positive := System.Task_Info.Number_Of_Processors;
+   N :  Positive := Gem.Getenv("NUMBER_OF_PROCESSORS",  System.Task_Info.Number_Of_Processors);
+   --N :  Positive := System.Task_Info.Number_Of_Processors;
    Ch : Character;
    Avail : Boolean;
-
+   T : Ada.Calendar.Time;
+   Cycle : Duration := Duration(Gem.Getenv("TIMEOUT",  LONG_FLOAT(Duration'Last)/2.0));
+   use type Ada.Calendar.Time;
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
      (NLP => GEM.LTE.LP'Length,
@@ -54,16 +58,10 @@ begin
       AP : Gem.LTE.Long_Periods_Amp_Phase  :=  GEM.dLOD("../dlod3.dat");
    begin
 
-      Text_IO.Put_Line(N'Img & " processors available");
+      Text_IO.Put_Line(N'Img & " processors available, timeout=" & Cycle'Img);
       GEM.LTE.Primitives.Shared.Load(D); -- if available
 
-      if GEM.Getenv("DLOD_REF", FALSE) then
-         Text_IO.Put_Line("Referencing dLOD");
-         for I in D.B.LPAP'Range loop
-           GEM.LTE.LPRef(I).Amplitude := Ap(I).Amplitude;
-           GEM.LTE.LPRef(I).Phase := Ap(I).Phase;
-         end loop;
-      else -- update
+      if GEM.Command_Line_Option_Exists("r") or not GEM.Getenv("DLOD_REF", FALSE) then
          Text_IO.Put_Line("Loading dLOD");
          for I in D.B.LPAP'Range loop
            GEM.LTE.LPRef(I).Amplitude := Ap(I).Amplitude;
@@ -71,25 +69,33 @@ begin
            D.B.LPAP(I).Amplitude := Ap(I).Amplitude;
            D.B.LPAP(I).Phase := Ap(I).Phase;
          end loop;
+      else -- update
+         Text_IO.Put_Line("Referencing dLOD");
+         for I in D.B.LPAP'Range loop
+           GEM.LTE.LPRef(I).Amplitude := Ap(I).Amplitude;
+           GEM.LTE.LPRef(I).Phase := Ap(I).Phase;
+         end loop;
       end if;
-      D.B.LT(1) := GEM.Getenv("LT1", D.B.LT(1));
-      D.B.LT(2) := GEM.Getenv("LT2", D.B.LT(2));
-      D.B.LT(3) := GEM.Getenv("LT3", D.B.LT(3));
-      D.B.LT(4) := GEM.Getenv("LT4", D.B.LT(4));
-      D.B.LT(5) := GEM.Getenv("LT5", D.B.LT(5));
-      D.B.LT(6) := GEM.Getenv("LT6", D.B.LT(6));
-      D.B.Offset := GEM.Getenv("OFFSET", D.B.Offset);
-      D.B.bg :=    GEM.Getenv("BG", D.B.bg);
-      D.B.shiftT := GEM.Getenv("SHIFTT", D.B.shiftT);
-      D.B.ImpA := GEM.Getenv("IMPAVALUE", D.B.ImpA);
-      D.B.ImpB := GEM.Getenv("IMPBVALUE", D.B.ImpB);
-      D.B.mA   := GEM.Getenv("MA",        D.B.mA);
-      D.B.mP   := GEM.Getenv("MP",        D.B.mP);
-      D.B.Init := GEM.Getenv("INIT",      D.B.Init);
-
+      --  D.B.LT(1) := GEM.Getenv("LT1", D.B.LT(1));
+      --  D.B.LT(2) := GEM.Getenv("LT2", D.B.LT(2));
+      --  D.B.LT(3) := GEM.Getenv("LT3", D.B.LT(3));
+      --  D.B.LT(4) := GEM.Getenv("LT4", D.B.LT(4));
+      --  D.B.LT(5) := GEM.Getenv("LT5", D.B.LT(5));
+      --  D.B.LT(6) := GEM.Getenv("LT6", D.B.LT(6));
+      --  D.B.Offset := GEM.Getenv("OFFSET", D.B.Offset);
+      --  D.B.bg :=    GEM.Getenv("BG", D.B.bg);
+      --  D.B.shiftT := GEM.Getenv("SHIFTT", D.B.shiftT);
+      --  D.B.ImpA := GEM.Getenv("IMPAVALUE", D.B.ImpA);
+      --  D.B.ImpB := GEM.Getenv("IMPBVALUE", D.B.ImpB);
+      --  D.B.mA   := GEM.Getenv("MA",        D.B.mA);
+      --  D.B.mP   := GEM.Getenv("MP",        D.B.mP);
+      --  D.B.Init := GEM.Getenv("INIT",      D.B.Init);
+      --
       GEM.LTE.Primitives.Shared.Put(D);
 
    end;
+
+   T := Ada.Calendar.Clock;
 
    GEM.LTE.Primitives.Solution.Start(D.NLP,D.NLT,N);
 
@@ -107,14 +113,21 @@ begin
       end;
       Text_IO.Get_Immediate(Ch, Avail);
       if Avail then
-         if Ch = 'q' then
+         if Ch = 'q' or Ch = 's' then
             GEM.LTE.Primitives.Stop;
          elsif Ch = 'x' then
             Text_IO.Put_Line("Exiting, no save");
             Gnat.Os_Lib.Os_Exit(0);
          end if;
       end if;
-      exit when GEM.LTE.Primitives.Halted;
+      if Ch = 'q' then
+         exit when GEM.LTE.Primitives.Halted;
+      end if;
+      if Ada.Calendar.Clock > T + Cycle then
+         GEM.LTE.Primitives.Stop;
+         T := Ada.Calendar.Clock;
+         exit when GEM.LTE.Primitives.Halted; -- new
+      end if;
    end loop;
    Text_IO.Put_Line("Main exiting, flushing other tasks");
 

@@ -1,0 +1,49 @@
+$env:xDLOD_REF="false"                       
+$env:TIMEOUT="180.0"
+
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
+$env:EXCLUDE="false"
+ .\enso_opt.exe
+$env:EXCLUDE="true"
+ .\enso_opt.exe
