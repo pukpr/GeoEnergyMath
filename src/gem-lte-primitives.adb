@@ -14,6 +14,10 @@ package body GEM.LTE.Primitives is
    Every_N_Line : constant Integer := GEM.Getenv("EVERY", 1);
    Magnify : constant Integer := GEM.Getenv("MAG", 1);
    Clip : constant LONG_FLOAT := GEM.Getenv("CLIP", 0.0);
+   Skip_Impulse : constant Integer := GEM.Getenv("SKIP", -1);
+   Start_Year : constant LONG_FLOAT := GEM.Getenv("CC_START", 0.0);
+   End_Year : constant LONG_FLOAT := GEM.Getenv("CC_END", 999999999.0);
+
 
 
    function Is_Minimum_Entropy return Boolean is
@@ -278,14 +282,17 @@ package body GEM.LTE.Primitives is
 
    -- Pearson's Correlation Coefficient
    function CC (X, Y : in Data_Pairs) return Long_Float is
-      N : Integer := X'Length;
+      N : Integer := 0; -- X'Length;
       sum_X, sum_Y, sum_XY, squareSum_X, squareSum_Y : Long_Float := 0.0;
       use Ada.Numerics.Long_Elementary_Functions;
       J : Integer := Y'First;
       Denominator : Long_Float;
    begin
       for I in X'Range loop
-        -- sum of elements of array X.
+         -- sum of elements of array X.
+         if X(I).Date > Start_Year and X(I).Date < End_Year
+           and (Skip_Impulse < 0 or I mod 6 /= Skip_Impulse) then
+
         sum_X := sum_X + X(i).Value;
 
         -- sum of elements of array Y.
@@ -297,8 +304,10 @@ package body GEM.LTE.Primitives is
         -- sum of square of array elements.
         squareSum_X := squareSum_X + X(i).Value * X(i).Value;
         squareSum_Y := squareSum_Y + Y(j).Value * Y(j).Value;
+            N := N + 1;
+         end if;
 
-        J := J + 1;
+         J := J + 1;
       end loop;
       -- assert the denominator that it doesn't hit zero
       Denominator := (Long_Float(n) * squareSum_X - sum_X * sum_X)

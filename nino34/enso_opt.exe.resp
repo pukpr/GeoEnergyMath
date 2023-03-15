@@ -1,7 +1,8 @@
 REF_TIME                       0.000
 ALIAS                          FALSE
 CAL                            FALSE
-CLIMATE_INDEX                  nino34.dat
+CLIMATE_INDEX0                  nino34.dat
+CLIMATE_INDEX                  ens_oni.dat
 DLOD_REF                       TRUE
 FILTER                         0.33
 FLIP                           0.001
@@ -31,7 +32,7 @@ SPREAD_CYCLE                   1000.0
 SPREAD_MIN                     0.0000001
 SPREAD_MAX                     0.1
 STARTING_METRIC                0.001
-STEP                           TRUE
+STEP                           false
 THRESHOLD                      99
 THRESHOLD_ACTION               CATCHUP
 TRAIN_END                      2010

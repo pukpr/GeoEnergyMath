@@ -24,5 +24,7 @@ package GEM.LTE.Primitives.Solution is
    -- 4.
 
    function Check_Every_N_Loops return Integer;
+   procedure Set_Trigger (Level: Integer);
+
 
 end GEM.LTE.Primitives.Solution;

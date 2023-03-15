@@ -16,6 +16,9 @@ package body GEM.LTE.Primitives.Solution is
    Is_Split : constant Boolean := GEM.Getenv("SPLIT_TRAINING", FALSE);
    Split_Low : constant Boolean := GEM.Getenv("SPLIT_LOW", TRUE);
    Alternate : constant Boolean :=  GEM.Getenv("ALTERNATE", FALSE);
+   Trigger : LONG_FLOAT :=  GEM.Getenv("TRIGGER", 0.0);
+   Ratio : constant LONG_FLOAT :=  GEM.Getenv("RATIO", 0.0);
+   NLoops : constant INTEGER :=  GEM.Getenv("NLOOPS", 100);
 
    function CompareRef(LP : in Long_Periods;
                        LPRef, AP : in Long_Periods_Amp_Phase) return Long_Float is
@@ -127,19 +130,23 @@ package body GEM.LTE.Primitives.Solution is
                        Best       : out Boolean;
                        BestClient : out Integer;
                        Percentage : out Integer) is
+         M : Long_Float := Metric + Ratio * OOB;
       begin
-         if Metric >= Best_Metric then
-            Waiting := not (Metric > Best_Metric);
-            Best_Metric := Metric;
+         if M >= Best_Metric then
+            Waiting := not (M > Best_Metric);
+            Best_Metric := M;
             Best_OOB := OOB;
             Best := True;
             Best_Client := Client;
             Best_Count := Count;
+            if Trigger > 0.0 and Best_OOB > Trigger then
+               Primitives.Stop;
+            end if;
          else
             Best := False;
          end if;
          if Best_Metric > Worst_Case then
-            Percentage := Integer(100.0*Metric/Best_Metric);
+            Percentage := Integer(100.0*M/Best_Metric);
          else
             Percentage := 0;
          end if;
@@ -291,6 +298,8 @@ package body GEM.LTE.Primitives.Solution is
       Revert_to_Mean  : constant Long_Float := GEM.Getenv("R2M", 1.0);
       Year_Trim  : constant Boolean := GEM.Getenv("YTRIM", FALSE);
       Lock_Freq  : constant Boolean := GEM.Getenv("LOCKF", TRUE);
+      Local_Max  : constant Boolean := GEM.Getenv("LOCAL", FALSE);
+      Lock_Tidal  : constant Boolean := GEM.Getenv("LOCKT", TRUE);
       RMS_Data : Long_Float := 0.0;
       Hale_Cycle : constant Long_Float := 22.0;
 
@@ -427,7 +436,7 @@ package body GEM.LTE.Primitives.Solution is
       end Put_CC;
 
       der : Long_Float;
-      CorrCoeff, Old_CC : Long_Float := 0.0;
+      CorrCoeff, Old_CC, Prior_Best_CC : Long_Float := 0.0;
       CorrCoeffP : Long_Float;
       CorrCoeffTest, Old_CCTest : Long_Float := 0.0;
       Progress_Cycle, Spread : Long_Float;
@@ -502,7 +511,7 @@ package body GEM.LTE.Primitives.Solution is
                                                 Set_Range => Size_Shared,
                                                 Harmonic_Range => Max_Harmonics);
 
-      Set, Keep : Walker.LF_Array (1 .. Size_Shared);
+      Set, Keep, Set0 : Walker.LF_Array (1 .. Size_Shared);
       for Set'Address use D.B.Offset'Address; -- This may require Ada rec rep clauses
       ------------------------------------------------------------------------
       NM : Integer := GEM.Getenv("NM", N_Modulations);
@@ -549,6 +558,7 @@ package body GEM.LTE.Primitives.Solution is
       end if;
       Text_IO.Put_Line("Catchup mode enabled:" & Boolean'Image(Catchup) );
       Keep := Set;
+      Set0 := Set;
 
       for I in 1 .. Harms'Length loop
          exit when D.C(I) = 0;
@@ -570,16 +580,19 @@ package body GEM.LTE.Primitives.Solution is
             GEM.LTE.Year_Adjustment(D.B.Year, D.A.LP); -- should be a protected call?
          end if;
          -- DBmP := 1.0/D.B.LT(NM);
-
+      --   D.A.LP(D.A.LP'First) := D.B.BG;
+         --D.A.LP(D.A.LP'Last) := D.B.BG;
+         --D.B.LPAP(D.A.LP'Last).Amplitude := D.B.IR;
+         --D.B.LPAP(D.A.LP'Last).Phase := D.B.shiftT;
          Impulses := Impulse_Amplify(
                             Raw     => Tide_Sum(Template     => Data_Records,
                                                 Constituents => D.B.LPAP,
                                                 Periods      => D.A.LP,
-                                                Ref_Time     => Ref_Time, --REMOVE + D.B.ShiftT,
+                                                Ref_Time     => Ref_Time + D.B.ShiftT,
                                                 Scaling      => Scaling,
                                                 Year_Len     => Year_Length
                                                ),
-                                     Offset => 0.0,  --REMOVE D.B.Offset,
+                                     Offset => D.B.Offset,
                                      Ramp => 0.0, -- D.B.bg,
                                      Start => Data_Records(Data_Records'First).Date);
 
@@ -588,12 +601,27 @@ package body GEM.LTE.Primitives.Solution is
                          iA => D.B.init, iB => 0.0, iC => 0.0, Start => 0.0*(TS-(Ref_Time + D.B.ShiftT)));
                          --iA => D.B.init, iB => 0.0, iC => 0.0, Start => 0.0*(TS-(Ref_Time + D.B.ShiftT)));
 
-         --  --  add a portion of the impulse back in
-         --  for I in First .. Last loop
-         --     Forcing(I).Value := Forcing(I).Value + Impulse_Residual*Impulses(I).Value;
-         --  end loop;
+         --  --  add a ramp
+ --        for I in Forcing'Range loop
+ --           Forcing(I).Value := Forcing(I).Value + Long_Float(I-First) * D.B.bg;
+ --        end loop;
          --
          M(1..NM) := D.B.LT(1..NM);
+         --M(1) := D.B.Offset;
+--         if NM > 1 then
+--           M(2) := D.B.shiftT;
+--         end if;
+----         if NM > 2 then
+----           M(3) := D.B.shiftT;
+----         end if;
+--         if NM > 3 then
+--           M(3) := M(1)-M(2);
+--           M(4) := M(1)+M(2);
+--           M(5) := 3.0*M(1);
+--           M(6) := 5.0*M(1);
+--           M(7) := 3.0*M(2);
+--           M(8) := 5.0*M(2);
+--         end if;
          if Lock_Freq then
             M(NM) := 1.0/(Decay*D.B.mP); -- mP
          end if;
@@ -625,14 +653,13 @@ package body GEM.LTE.Primitives.Solution is
          end if;
 
       CorrCoeff := 0.0;
-      Pareto_Scale := 0.0;
+      Pareto_Scale := 1.0;
       if Pareto then
             Pareto_Start := 1;
       else
             Pareto_Start := NH+1;
       end if;
       for Pareto_Index in Pareto_Start .. NH+1 loop
-         Pareto_Scale := Pareto_Scale + 1.0/Long_Float(Pareto_Index);
          --  if Pareto then
          --     if Pareto_Index = Pareto_Start then
          --        Pareto_Mult := 1.0;
@@ -693,9 +720,19 @@ package body GEM.LTE.Primitives.Solution is
             end if;
          end if;
 
-         CorrCoeff := CorrCoeffP/Long_Float(Pareto_Index) + CorrCoeff;
+         if Pareto then
+            if Pareto_Index = Pareto_Start then
+               CorrCoeff := CorrCoeffP;
+            else
+               Pareto_Scale := Pareto_Scale + 1.0/Long_Float(Harms(Pareto_Index-1));
+               CorrCoeff := CorrCoeffP/Long_Float(Harms(Pareto_Index-1)) + CorrCoeff;
+            end if;
+         else
+            CorrCoeff := CorrCoeffP;
+            exit;
+         end if;
          -- CorrCoeff := CorrCoeffP/Pareto_Mult + CorrCoeff;
-         exit when not Pareto;
+         -- exit when not Pareto;
       end loop;  -- Pareto
 
          CorrCoeff := CorrCoeff/Pareto_Scale;
@@ -732,7 +769,11 @@ package body GEM.LTE.Primitives.Solution is
                GEM.LTE.Primitives.Shared.Put(D);
             end if;
             Harms_Keep := Harms;
+         elsif Local_Max and CorrCoeff > Prior_Best_CC then
+            -- Don't revert to Keep values
+            Prior_Best_CC := CorrCoeff;
          else
+            -- Go back to starting point (Keep) if local max not retained
             Set := Keep;
             Harms := Harms_Keep;
          end if;
@@ -761,7 +802,16 @@ package body GEM.LTE.Primitives.Solution is
          else
             Spread := Spread_Min + Spread_Max*(1.0-LEF.Cos(Progress_Cycle/Spread_Cycle));
          end if;
-         Walker.Markov(Set, Keep, Spread);
+         if Lock_Tidal then
+            declare
+               DBLAP : constant Amp_Phases := D.B.LPAP;
+            begin
+               Walker.Markov(Set, Keep, Spread, Set0);
+               D.B.LPAP := DBLAP;
+            end;
+         else
+            Walker.Markov(Set, Keep, Spread, Set0);
+         end if;
          Walker.Random_Harmonic(Harms, Harms_Keep);
 --       for I in Harms'Range loop
 --           Walker.Random_Harmonic(Harms(I), Harms_Keep(I));
@@ -835,9 +885,13 @@ package body GEM.LTE.Primitives.Solution is
       if Is_Split then
          return 1;
       else
-         return 100;
+         return NLoops;
       end if;
    end Check_Every_N_Loops;
 
+   procedure Set_Trigger (Level: Integer) is
+   begin
+      Trigger := Long_Float(Level)/10.0;
+   end Set_Trigger;
 
 end GEM.LTE.Primitives.Solution;

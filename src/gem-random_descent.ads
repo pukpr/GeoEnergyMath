@@ -15,11 +15,13 @@ package GEM.Random_Descent is
    -- are scaled by the Spread parameter.
    procedure Markov (Set : in out LF_Array;  -- Randomly selects from param set
                      Ref : out LF_Array;     -- returns the unchanged set
-                     Spread : in Long_Float);
+                     Spread : in Long_Float;
+                     Cal : in LF_Array);     -- Calibrated starting point
 
    procedure Markov (Value : in out Long_Float;  -- Randomly selects from param set
                      Ref : out Long_Float;     -- returns the unchanged set
-                     Spread : in Long_Float);
+                     Spread : in Long_Float;
+                     Cal : in Long_Float);
 
    procedure Dump(Set : in LF_Array);
 

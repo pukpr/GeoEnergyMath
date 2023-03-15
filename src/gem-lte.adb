@@ -5,6 +5,7 @@ package body GEM.LTE is
 
    Year_in_Days : constant := 365.2422484;  -- 365.241237718675000;
    Year_Correction : Long_Float := GEM.Getenv("YEAR", 0.0);
+   dLOD_Mod : Long_Float := GEM.Getenv("dLOD_Mod", 1.0);
    Year_Dynamic_Correction  : Long_Float := 0.0;
 
    function Year_Length return Long_Float is
@@ -16,11 +17,15 @@ package body GEM.LTE is
    function Doodson (I : in Integer;
                      D : in Doodson_List) return Long_Float is
    begin
-      return 1.0/
+      if D(I).h = 1 and dLOD_Mod /= 1.0 then
+         return dLOD_Mod * Year_Length;
+      else
+         return 1.0/
         (Long_Float(D(I).s) / Tropical +
          Long_Float(D(I).h) / Year_Length +
          Long_Float(D(I).p) / p +
            Long_Float(D(I).N) / N );
+      end if;
    end Doodson;
 
    procedure Year_Adjustment (Value : in Long_Float;

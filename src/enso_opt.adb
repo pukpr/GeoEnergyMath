@@ -14,6 +14,7 @@ procedure ENSO_Opt is
    Avail : Boolean;
    T : Ada.Calendar.Time;
    Cycle : Duration := Duration(Gem.Getenv("TIMEOUT",  LONG_FLOAT(Duration'Last)/2.0));
+   dLOD_Scale : constant Long_Float := GEM.Getenv("DLOD_SCALE", 0.0);
    use type Ada.Calendar.Time;
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
@@ -66,7 +67,7 @@ begin
          for I in D.B.LPAP'Range loop
            GEM.LTE.LPRef(I).Amplitude := Ap(I).Amplitude;
            GEM.LTE.LPRef(I).Phase := Ap(I).Phase;
-           D.B.LPAP(I).Amplitude := Ap(I).Amplitude;
+           D.B.LPAP(I).Amplitude := Ap(I).Amplitude * (1.0 + dLOD_Scale*D.A.LP(I));
            D.B.LPAP(I).Phase := Ap(I).Phase;
          end loop;
       else -- update
@@ -110,6 +111,7 @@ begin
          --if I mod 100 = 0 then
             Text_IO.Put_Line(S & " #" & I'Img);
          end if;
+         exit when GEM.LTE.Primitives.Halted;
       end;
       Text_IO.Get_Immediate(Ch, Avail);
       if Avail then
@@ -118,6 +120,8 @@ begin
          elsif Ch = 'x' then
             Text_IO.Put_Line("Exiting, no save");
             Gnat.Os_Lib.Os_Exit(0);
+         elsif Ch in '1' .. '9' then
+             GEM.LTE.Primitives.Solution.Set_Trigger (Character'Pos(Ch) - Character'Pos('1') + 1);
          end if;
       end if;
       if Ch = 'q' then

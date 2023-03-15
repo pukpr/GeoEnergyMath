@@ -14,6 +14,7 @@ package body GEM.Random_Descent is
    Flip_Value : constant Long_Float := GEM.Getenv("FLIP", 0.0);
    Fix_Harm : constant BOOLEAN := GEM.Getenv("FIX", FALSE);
    Log_Harm : constant BOOLEAN := GEM.Getenv("LOGH", FALSE);
+   Relative : constant BOOLEAN := GEM.Getenv("REL", TRUE);
 
    subtype Harmonic_Index is Positive range 2..Harmonic_Range;
    package HR is new Ada.Numerics.Discrete_Random(Harmonic_Index);
@@ -25,7 +26,8 @@ package body GEM.Random_Descent is
 
    procedure Markov (Set : in out LF_Array;
                      Ref : out LF_Array;
-                     Spread : in Long_Float) is
+                     Spread : in Long_Float;
+                     Cal : in LF_Array) is
       Ran : Long_Float := Long_Float(FR.Random(G));
       Sign : Long_Float := Long_Float(FR.Random(G) - 0.5); -- Is step + or - ?
       Adjust : Long_Float;
@@ -37,15 +39,20 @@ package body GEM.Random_Descent is
          if Flip_Value < 0.0 then
             Set(I) := Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
          else
-            Markov(Set, Ref, Spread);  -- recurse, pick another
+            Markov(Set, Ref, Spread, Cal);  -- recurse, pick another
          end if;
       elsif Fixed(Set(I)) then
-         Markov(Set, Ref, Spread);  -- recurse, pick another
+         Markov(Set, Ref, Spread, Cal);  -- recurse, pick another
       else
-         Adjust := 1.0 + Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
-         Set(I) := Set(I) * Adjust;
-         if Ran < Flip_Value then
-            Set(I) := -Set(I);
+         if Relative then
+            Adjust := 1.0 + Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
+            Set(I) := Set(I) * Adjust;
+            if Ran < Flip_Value then
+               Set(I) := -Set(I);
+            end if;
+         else
+            Adjust := Spread * Cal(I) * Long_Float'Copy_Sign(Ran, Sign);
+            Set(I) := Cal(I) + Adjust;
          end if;
       end if;
       --end loop;
@@ -53,16 +60,22 @@ package body GEM.Random_Descent is
 
    procedure Markov (Value : in out Long_Float;
                      Ref : out Long_Float;
-                     Spread : in Long_Float) is
+                     Spread : in Long_Float;
+                     Cal : in Long_Float) is
       Ran : Long_Float := Long_Float(FR.Random(G));
       Sign : Long_Float := Long_Float(FR.Random(G) - 0.5); -- Is step + or - ?
       Adjust : Long_Float;
    begin
       Ref := Value;
-      Adjust := 1.0 + Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
-      Value := Value * Adjust;
-      if Ran < Flip_Value then
-         Value := -Value;
+      if Relative then
+         Adjust := 1.0 + Spread * Long_Float'Copy_Sign(LEF.Log(Ran), Sign);
+         Value := Value * Adjust;
+         if Ran < Flip_Value then
+            Value := -Value;
+         end if;
+      else
+         Adjust := Spread * Cal * Long_Float'Copy_Sign(Ran, Sign);
+         Value := Cal + Adjust;
       end if;
    end Markov;
 

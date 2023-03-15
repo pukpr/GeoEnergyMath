@@ -3,6 +3,7 @@ ALIAS                          FALSE
 CAL                            FALSE
 CLIMATE_INDEX                  iod.dat
 DLOD_REF                       TRUE
+EXCLUDE                        FALSE
 FILTER                         0.2
 FLIP                           0.001
 FORCING                        FALSE
@@ -32,11 +33,11 @@ SPREAD_CYCLE                   1000.0
 SPREAD_MIN                     0.000000001
 SPREAD_MAX                     0.5
 STARTING_METRIC                0.001
-STEP                           TRUE
+STEP                           false
 THRESHOLD                      99
 THRESHOLD_ACTION               CATCHUP
 TRAIN_END                      2010
 TRAIN_START                    1890
 TREND                          TRUE
-YEAR                           0.001000019
+YEAR                           -0.0000099810
 --OFFSET                         0.25

@@ -47,3 +47,5 @@ $env:EXCLUDE="false"
  .\enso_opt.exe
 $env:EXCLUDE="true"
  .\enso_opt.exe
+
+$env:TIMEOUT=""
