@@ -1,7 +1,7 @@
 using Flux, Plots, CSV, DataFrames, Distributions, Statistics, Printf, DSP;
 
 function forcefit3(n_loop, n_hidden, n_layers, N1, N::Integer, file_n::String, x::AbstractArray{Int,1}=[4,2,1], 
-                   w::Integer=3, slope::Float64=1.0, Exclude::Bool=true, MA::Bool=true)
+                   w::Integer=3, slope::Float64=1.0, Exclude::Bool=true, MA::Bool=true, Default::Bool=true)
            ## Parameterize training NN
   function create_repeated_dense_layers(n_in, n_hidden, n_out, n_layers, activation)
      layers = []
@@ -25,15 +25,18 @@ function forcefit3(n_loop, n_hidden, n_layers, N1, N::Integer, file_n::String, x
   end
            ## Set up training model
   tans(x) = -(x*2.0)*exp(-(2.0*x)^2/2)
-  model = Chain(create_repeated_dense_layers(n_input, n_hidden, 1, n_layers, tanh))
+  if Default
+    model = Chain(create_repeated_dense_layers(n_input, n_hidden, 1, n_layers, tanh))
+  else
+    model = Chain(create_repeated_dense_layers(n_input, n_hidden, 1, n_layers, tans))
+  end
   loss(input, output) = Flux.Losses.mse(model(input), output)
   if Exclude
      train_data = [(Matrix(vcat(f[1:N1,:], f[N:N0,:])'), Array(vcat(d[1:N1], d[N:N0])'))];
   else
      train_data = [(Matrix(f[N1:N,:]'), Array(d[N1:N]'))];
   end
-  #optimiser = Descent(0.1);
-  optimiser = Adam(0.001); #0.001
+  Default ? optimiser = Adam(0.001) : optimiser = Descent(0.1);
 
            ## Train model and periodically evaluate
   Index = 1.0;
