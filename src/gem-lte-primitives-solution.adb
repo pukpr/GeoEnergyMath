@@ -590,7 +590,8 @@ package body GEM.LTE.Primitives.Solution is
                                                 Periods      => D.A.LP,
                                                 Ref_Time     => Ref_Time + D.B.ShiftT,
                                                 Scaling      => Scaling,
-                                                Year_Len     => Year_Length
+                                                Year_Len     => Year_Length,
+                                                Integ        => D.B.bg
                                                ),
                                      Offset => D.B.Offset,
                                      Ramp => 0.0, -- D.B.bg,

@@ -9,6 +9,7 @@ with Ada.Calendar;
 
 procedure ENSO_Opt is
    N :  Positive := Gem.Getenv("NUMBER_OF_PROCESSORS",  System.Task_Info.Number_Of_Processors);
+   dLOD_dat : String := Gem.Getenv("DLOD_DAT",  "../dlod3.dat"); 
    --N :  Positive := System.Task_Info.Number_Of_Processors;
    Ch : Character;
    Avail : Boolean;
@@ -56,7 +57,7 @@ procedure ENSO_Opt is
    -- Ref : GEM.LTE.Long_Periods_Amp_Phase := GEM.LTE.LPAP;
 begin
    declare
-      AP : Gem.LTE.Long_Periods_Amp_Phase  :=  GEM.dLOD("../dlod3.dat");
+      AP : Gem.LTE.Long_Periods_Amp_Phase  :=  GEM.dLOD(dLOD_dat);
    begin
 
       Text_IO.Put_Line(N'Img & " processors available, timeout=" & Cycle'Img);

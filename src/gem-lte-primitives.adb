@@ -192,7 +192,8 @@ package body GEM.LTE.Primitives is
                       Ref_Time : in Long_Float := 0.0;
                       Scaling : in Long_Float := 1.0;
                       Cos_Phase : in Boolean := True;
-                      Year_Len : in Long_Float := Year_Length
+                      Year_Len : in Long_Float := Year_Length;
+                      Integ: in Long_Float := 0.0
                       ) return Data_Pairs is
       Pi : Long_Float := Ada.Numerics.Pi;
       Time : Long_Float;
@@ -217,9 +218,11 @@ package body GEM.LTE.Primitives is
                      end if;
                   end if;
                   if Cos_Phase then
-                     TF := TF + L.Amplitude*Cos(2.0*Pi*Year_Len/Period*Time + L.Phase);
+                     TF := TF + L.Amplitude*(Cos(2.0*Pi*Year_Len/Period*Time + L.Phase) +
+                                Integ*Period*Sin(2.0*Pi*Year_Len/Period*Time + L.Phase) );
                   else
-                     TF := TF + L.Amplitude*Sin(2.0*Pi*Year_Len/Period*Time + L.Phase);
+                     TF := TF + L.Amplitude*(Sin(2.0*Pi*Year_Len/Period*Time + L.Phase) -
+                                Integ*Period*Cos(2.0*Pi*Year_Len/Period*Time + L.Phase) );
                   end if;
                end;
             end loop;
