@@ -22,17 +22,19 @@ package body GEM.LTE.Primitives.Solution is
 
    function CompareRef(LP : in Long_Periods;
                        LPRef, AP : in Long_Periods_Amp_Phase) return Long_Float is
-      Ref, R2, M2 : Data_Pairs(1..7300);
-      Time : Long_Float := 1962.00547;
+      dLOD_dat : String := Gem.Getenv("DLOD_DAT",  "../dlod3.dat");
+      D : Data_Pairs := Make_Data(dLOD_dat);
+      Ref, R2, M2 : Data_Pairs := D;
+      --Time : Long_Float := 1962.00547;
       Metric : Long_Float := -1.0;
-      dT : Long_Float := 1.0/Year_Length;
+      --dT : Long_Float := 1.0/Year_Length;
       Ref_Time : Long_Float := 0.0;
       File : Text_IO.File_Type;
    begin
-      for I in Ref'Range loop
-         Time := Time + dT;
-         Ref(I) := (Time, 0.0);
-      end loop;
+      --for I in Ref'Range loop
+      --   Time := Time + dT;
+      --   Ref(I) := (Time, 0.0);
+      --end loop;
 
       --for I in -10 .. 10 loop
       --   Ref_Time := Long_Float(I) * dT;
@@ -54,6 +56,11 @@ package body GEM.LTE.Primitives.Solution is
       Text_IO.Create(File, Text_IO.Out_File, "dlod_compare.csv");
       for I in R2'Range loop
          Text_IO.Put_Line(File, R2(I).Date'Img & "," & R2(I).Value'Img & "," & M2(I).Value'Img);
+      end loop;
+      Text_IO.Close(File);
+      Text_IO.Create(File, Text_IO.Out_File, "dlod_ref.dat");
+      for I in R2'Range loop
+         Text_IO.Put_Line(File, R2(I).Date'Img & ASCII.HT & M2(I).Value'Img);
       end loop;
       Text_IO.Close(File);
       return Metric;
@@ -300,6 +307,7 @@ package body GEM.LTE.Primitives.Solution is
       Lock_Freq  : constant Boolean := GEM.Getenv("LOCKF", TRUE);
       Local_Max  : constant Boolean := GEM.Getenv("LOCAL", FALSE);
       Lock_Tidal  : constant Boolean := GEM.Getenv("LOCKT", TRUE);
+      Seasonal_Offset  : constant Integer := GEM.Getenv("MONTH", 0);
       RMS_Data : Long_Float := 0.0;
       Hale_Cycle : constant Long_Float := 22.0;
 
@@ -334,7 +342,7 @@ package body GEM.LTE.Primitives.Solution is
       begin
          if Trunc = DPos then
             Value := D.B.delA;
-         elsif Trunc = DPos + Other_Half then
+         elsif Trunc = DPos + Other_Half + Seasonal_Offset then
             if Symmetric = 1 then
                Value := D.B.delA;
             elsif Symmetric = -1 then
@@ -371,7 +379,7 @@ package body GEM.LTE.Primitives.Solution is
          --if ImpA > 0 then
             -- using the impA & impB env vars as odd & even powers, since they won't be used for impulse
             -- Value := D.B.ImpA*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpA+D.B.ImpC*(COS(2.0*Pi*(Time+D.B.ImpB)))**ImpB + D.B.ImpD*COS(2.0*Pi*(Time+D.B.ImpB));
-         Value := COS(2.0*Pi*(Time+D.B.ImpB));
+         Value := COS(4.0*Pi*(Time+D.B.ImpB)); --
          if Sin_Power = 1 then
             --Value :=  D.B.ImpA*Value**Sin_Power;
             Value := D.B.ImpA*(abs(Value))**(D.B.ImpC); -- all positive
@@ -602,6 +610,9 @@ package body GEM.LTE.Primitives.Solution is
                          iA => D.B.init, iB => 0.0, iC => 0.0, Start => 0.0*(TS-(Ref_Time + D.B.ShiftT)));
                          --iA => D.B.init, iB => 0.0, iC => 0.0, Start => 0.0*(TS-(Ref_Time + D.B.ShiftT)));
 
+         --median
+         --Forcing := Median(Forcing);
+
          --  --  add a ramp
  --        for I in Forcing'Range loop
  --           Forcing(I).Value := Forcing(I).Value + Long_Float(I-First) * D.B.bg;
@@ -699,7 +710,10 @@ package body GEM.LTE.Primitives.Solution is
                Model := Filter9Point(Model);
             end loop;
          else
-            -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
+               -- extra filtering, 2 equal-weighted 3-point box windows creating triangle
+            if Filter > 0.0 then
+              Model := Median(Model);
+            end if;
             Model := FIR(FIR(Model,Filter,1.0-2.0*Filter,Filter), Filter, 1.0-2.0*Filter, Filter);
          end if;
 
@@ -844,6 +858,8 @@ package body GEM.LTE.Primitives.Solution is
                DKeep.C(I-NM) := Integer(M(I)/M(NM));
             end if;
          end loop;
+         Text_IO.Put_Line("```");
+
 
          --  if Is_Minimum_Entropy then --  and not MLR_On then
          --     Forcing := LTE(Forcing => Forcing,
@@ -869,7 +885,7 @@ package body GEM.LTE.Primitives.Solution is
          Put(CorrCoeff, ":dLOD:");
 
       else
-         Text_IO.Put_Line("Exited " & ID'Img);
+         null; -- Text_IO.Put_Line("Exited " & ID'Img);
       end if;
 
 

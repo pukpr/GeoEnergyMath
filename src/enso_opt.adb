@@ -62,7 +62,8 @@ begin
 
       Text_IO.Put_Line(N'Img & " processors available, timeout=" & Cycle'Img);
       GEM.LTE.Primitives.Shared.Load(D); -- if available
-
+      GEM.LTE.Year_Adjustment(D.B.Year, D.A.LP); -- should be a protected call?
+      Text_IO.Put_Line("YA=" & D.B.Year'Img);
       if GEM.Command_Line_Option_Exists("r") or not GEM.Getenv("DLOD_REF", FALSE) then
          Text_IO.Put_Line("Loading dLOD");
          for I in D.B.LPAP'Range loop
@@ -71,12 +72,15 @@ begin
            D.B.LPAP(I).Amplitude := Ap(I).Amplitude * (1.0 + dLOD_Scale*D.A.LP(I));
            D.B.LPAP(I).Phase := Ap(I).Phase;
          end loop;
+         --D.B.LPAP(28).Amplitude := D.B.LPAP(28).Amplitude/10.0;
+         --GEM.LTE.LPRef(28).Amplitude := D.B.LPAP(28).Amplitude;
       else -- update
          Text_IO.Put_Line("Referencing dLOD");
          for I in D.B.LPAP'Range loop
            GEM.LTE.LPRef(I).Amplitude := Ap(I).Amplitude;
            GEM.LTE.LPRef(I).Phase := Ap(I).Phase;
          end loop;
+         --GEM.LTE.LPRef(28).Amplitude := AP(28).Amplitude/10.0;
       end if;
       --  D.B.LT(1) := GEM.Getenv("LT1", D.B.LT(1));
       --  D.B.LT(2) := GEM.Getenv("LT2", D.B.LT(2));
@@ -134,7 +138,7 @@ begin
          exit when GEM.LTE.Primitives.Halted; -- new
       end if;
    end loop;
-   Text_IO.Put_Line("Main exiting, flushing other tasks");
+   --Text_IO.Put_Line("Main exiting, flushing other tasks");
 
 
    delay 5.0;

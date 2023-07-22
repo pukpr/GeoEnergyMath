@@ -219,6 +219,7 @@ package body GEM.LTE.Primitives.Shared is
              D.A.LP(I),
              D.B.LPAP(I).Amplitude,
              D.B.LPAP(I).Phase);
+         D.A.LP(I) := Gem.LTE.LP(I); -- OVERRIDE!
       end loop;
       for I in D.B.LT'Range loop
          Read(FT, "ltep", D.B.LT(I));
@@ -270,7 +271,12 @@ package body GEM.LTE.Primitives.Shared is
    end Load;
 
    procedure Dump (D : in Param_S) is
+      function Percent(A,B : in Long_Float) return String is
+      begin
+         return ", " & Integer'Image( Integer((B-A)/A*100.0) );
+      end Percent;
    begin
+         Ada.Text_IO.Put_Line("```");
          Put(D.B.Offset, " :offset:", NL);
          Put(D.B.Bg,     " :bg:", NL);
          Put(D.B.ImpA,   " :impA:", NL);
@@ -293,7 +299,7 @@ package body GEM.LTE.Primitives.Shared is
          for I in D.B.LPAP'Range loop
             Put(D.A.LP(I), ", ");
             Put(D.B.LPAP(I).Amplitude, ", ");
-            Put(D.B.LPAP(I).Phase, I'Img, NL);
+            Put(D.B.LPAP(I).Phase, ", " & I'Img & Percent(GEM.LTE.LPRef(I).Amplitude, D.B.LPAP(I).Amplitude) & ", " & GEM.LTE.LPRef(I).Amplitude'Img, NL);
          end loop;
          --Ada.Text_IO.Put_Line("---- LTE static ----");
          --for I in D.B.LT'Range loop
