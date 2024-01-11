@@ -17,7 +17,9 @@ package body GEM.LTE.Primitives is
    Skip_Impulse : constant Integer := GEM.Getenv("SKIP", -1);
    Start_Year : constant LONG_FLOAT := GEM.Getenv("CC_START", 0.0);
    End_Year : constant LONG_FLOAT := GEM.Getenv("CC_END", 999999999.0);
-
+   Sinc: constant LONG_FLOAT := GEM.Getenv("SINC", 0.0);
+   --LTE_abs: constant Boolean := GEM.Getenv("ABS", FALSE);
+   Modulation : constant Boolean := GEM.Getenv("MODULATION", FALSE);
 
 
    function Is_Minimum_Entropy return Boolean is
@@ -126,6 +128,9 @@ package body GEM.LTE.Primitives is
                  Start : in Long_Float := Long_Float'First) return  Data_Pairs is
       Res : Data_Pairs := Raw;
       Start_Index : Integer;
+      Ramp : Long_Float;
+      Pi : Long_Float := Ada.Numerics.Pi;
+      use Ada.Numerics.Long_Elementary_Functions;
    begin
       for I in Raw'Range loop
          Start_Index := I;
@@ -139,11 +144,16 @@ package body GEM.LTE.Primitives is
       Res(Start_Index + 2).Value := iB;
       Res(Start_Index + 3).Value := iA;
       for I in Start_Index + 4 .. Raw'Last loop
+         if Modulation then
+            Ramp := Long_Float'Copy_Sign(lagC, Res(I-1).Value)*(1.0-cos(2.0*pi*Raw(I).Date));
+         else
+            Ramp := Long_Float'Copy_Sign(lagC, Res(I-1).Value);
+         end if;
          Res(I).Value := Raw(I-1).Value
            + lagA*Res(I-1).Value
            + lagB*Res(I-2).Value
            -- + lagC*Res(I-3).Value;
-           - Long_Float'Copy_Sign(lagC, Res(I-1).Value);
+           - Ramp; -- Long_Float'Copy_Sign(lagC, Res(I-1).Value);
       end loop;
       -- Backwards integration
       --  for I in reverse Raw'First .. Start_Index-1 loop
@@ -152,11 +162,16 @@ package body GEM.LTE.Primitives is
       --       - lagB*Res(I+1).Value)/lagC;
       --  end loop;
       for I in Raw'First+4 .. Start_Index-1 loop
+         if Modulation then
+            Ramp := Long_Float'Copy_Sign(lagC, Res(I-1).Value)*(1.0-cos(2.0*pi*Raw(I).Date));
+         else
+            Ramp := Long_Float'Copy_Sign(lagC, Res(I-1).Value);
+         end if;
          Res(I).Value := Raw(I-1).Value
            + lagA*Res(I-1).Value
            + lagB*Res(I-2).Value
            -- + lagC*Res(I-3).Value;
-           + Long_Float'Copy_Sign(lagC, Res(I-1).Value);
+           + Ramp; -- Long_Float'Copy_Sign(lagC, Res(I-1).Value);
       end loop;
       return Res;
    end IIR;
@@ -253,13 +268,21 @@ package body GEM.LTE.Primitives is
                   M : GEM.LTE.Amp_Phase renames Amp_Phase(J);
                   SW : Long_Float;
                begin
-                  SW := Sin(2.0*Pi*Wave_Numbers(J)*Res(I).Value + M.Phase);
+                  --if LTE_Abs then
+                  --   SW := Sin(2.0*Pi*Wave_Numbers(J)*abs(Res(I).Value) + M.Phase);
+                  --else
+                     SW := Sin(2.0*Pi*Wave_Numbers(J)*Res(I).Value + M.Phase);
+                  --end if;
                   if SW < 0.0 then
                      SW := -(abs SW) ** NonLin;
                   else
                      SW := SW ** NonLin;
                   end if;
-                  LF := LF + M.Amplitude*SW;
+                  if Sinc > 0.0 then
+                     LF := LF + M.Amplitude*SW/(abs(Res(I).Value)+Sinc);
+                  else
+                     LF := LF + M.Amplitude*SW;
+                  end if;
                exception
                   when Constraint_Error =>
                      null;
@@ -288,13 +311,32 @@ package body GEM.LTE.Primitives is
       N : Integer := 0; -- X'Length;
       sum_X, sum_Y, sum_XY, squareSum_X, squareSum_Y : Long_Float := 0.0;
       use Ada.Numerics.Long_Elementary_Functions;
-      J : Integer := Y'First;
+      J : Integer; --:= Y'First;
       Denominator : Long_Float;
+      Start, Stop : Integer;
    begin
+      Start := X'First;
+      Stop := X'Last;
       for I in X'Range loop
+        if X(I).Value = 0.0 or Y(I).Value = 0.0 then
+           Start := I + 1;
+        else
+           exit;
+        end if;
+      end loop;
+      for I in reverse X'Range loop
+        if X(I).Value = 0.0 or Y(I).Value = 0.0 then
+           Stop := I - 1;
+        else
+           exit; 
+        end if;
+      end loop;
+      J := Y'First + (Start-X'First);
+      --for I in X'Range loop
+      for I in Start .. Stop loop
          -- sum of elements of array X.
          if X(I).Date > Start_Year and X(I).Date < End_Year
-           and (Skip_Impulse < 0 or I mod 6 /= Skip_Impulse) then
+           and not (X(i).Value = 0.0 or Y(j).Value = 0.0) then
 
         sum_X := sum_X + X(i).Value;
 
@@ -360,6 +402,59 @@ package body GEM.LTE.Primitives is
       -- return 1.0 - sqrt(sum_XY)/Ref;
       return 1.0/(1.0+sqrt(sum_XY)/Ref);
    end RMS;
+
+   function DTW_Distance(X, Y: in Data_Pairs; Window_Size: Positive) return Long_Float is
+    function Distance(X, Y: in Data_Pairs; Window_Size: Positive) return Long_Float is
+        N : Positive := X'Length;
+        type Real_Array is array(X'First - Window_Size .. X'Last + Window_Size) of Long_Float;
+        DTW_Current, DTW_Previous : Real_Array := (others => Long_Float'Last);
+    begin
+        DTW_Previous(X'First) := 0.0;
+
+        for I in X'First .. X'Last loop
+            DTW_Current(X'First) := Long_Float'Last; -- Reset current row
+
+            for J in Integer'Max(X'First, I - Window_Size) .. Integer'Min(X'Last, I + Window_Size) loop
+                declare
+                    Cost : Long_Float := Abs(X(I).Value - Y(J).Value);
+                    Min_Cost : Long_Float;
+                    J_Previous : Integer := Integer'Max(J - 1, Y'First);
+                begin
+                    -- Compute minimum cost considering the DTW constraint
+                    Min_Cost := Long_Float'Min( Long_Float'Min(
+                        DTW_Previous(J_Previous),
+                        DTW_Current(J_Previous)),
+                        (if J > Y'First then DTW_Previous(J) else Long_Float'Last)
+                    );
+
+                    DTW_Current(J) := Cost + Min_Cost;
+                end;
+                N := J;
+            end loop;
+
+            -- Swap the rows
+            DTW_Previous := DTW_Current;
+        end loop;
+
+        --return 1.0/DTW_Current(N);
+        return DTW_Current(N);
+    end Distance;
+
+    function Neg (X : in Data_Pairs) return Data_Pairs is
+      N : Data_Pairs := X;
+    begin
+      for I in N'Range loop
+        N(I).Value := -N(I).Value;
+      end loop;
+      return N;
+    end Neg;
+    Max : Long_Float;
+   begin
+    Max := Distance(Neg(Y), Y, Window_Size);
+    return (Max-Distance(X, Y, Window_Size))/Max;
+    --return Distance(X, Y, Window_Size)
+   end DTW_Distance;
+
 
    Pi : constant Long_Float := Ada.Numerics.Pi;
    Mult : constant Long_Float := GEM.Getenv("FMULT", 1.006);  -- 1.003 1.012 1.02 --1.05
@@ -826,11 +921,14 @@ package body GEM.LTE.Primitives is
    function Filter9Point (Raw : in Data_Pairs) return  Data_Pairs is
       Res : Data_Pairs := Raw;
    begin
-      for I in Raw'First + 4 .. Raw'Last - 4 loop
+      for I in Raw'First + 1 .. Raw'Last - 1 loop -- 4
          Res(I).Value :=
-           1.0/3.0 * ( 0.25*(Raw(I-4).Value + Raw(I-3).Value + Raw(I-2).Value)+
-                       0.5*(Raw(I-1).Value + Raw(I).Value + Raw(I+1).Value)+
-                       0.25*(Raw(I+2).Value + Raw(I+3).Value + Raw(I+4).Value) );
+          -- 1.0/3.0 * ( 0.25*(Raw(I-4).Value + Raw(I-3).Value + Raw(I-2).Value)+
+          --             0.5*(Raw(I-1).Value + Raw(I).Value + Raw(I+1).Value)+
+          --             0.25*(Raw(I+2).Value + Raw(I+3).Value + Raw(I+4).Value) );
+            0.25*(+ Raw(I-1).Value)+
+                       0.5*(+ Raw(I).Value)+
+                       0.25*( + Raw(I+1).Value)  ;
       end loop;
       return Res;
    end Filter9Point;

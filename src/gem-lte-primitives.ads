@@ -81,6 +81,9 @@ package GEM.LTE.Primitives is
    -- Zero-crossing metric
    function Xing (X, Y : in Data_Pairs) return Long_Float;
 
+   -- Dynamic Time Warp, Sakoe_Chiba_Optimized
+   function DTW_Distance(X, Y: in Data_Pairs; Window_Size: Positive) return Long_Float;
+
    -- RMS
    function RMS (X, Y : in Data_Pairs;
                  Ref, Offset : in Long_Float) return Long_Float;

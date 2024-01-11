@@ -7,7 +7,7 @@ with GEM.dLOD;
 with GNAT.OS_Lib;
 with Ada.Calendar;
 
-procedure ENSO_Opt is
+procedure ENSO_Opt is  -- gprbuild lte.gpr enso_opt -largs -Wl,--stack=40000000
    N :  Positive := Gem.Getenv("NUMBER_OF_PROCESSORS",  System.Task_Info.Number_Of_Processors);
    dLOD_dat : String := Gem.Getenv("DLOD_DAT",  "../dlod3.dat"); 
    --N :  Positive := System.Task_Info.Number_Of_Processors;
@@ -16,6 +16,7 @@ procedure ENSO_Opt is
    T : Ada.Calendar.Time;
    Cycle : Duration := Duration(Gem.Getenv("TIMEOUT",  LONG_FLOAT(Duration'Last)/2.0));
    dLOD_Scale : constant Long_Float := GEM.Getenv("DLOD_SCALE", 0.0);
+   Expect : constant Boolean := GEM.Getenv("EXPECT", false);
    use type Ada.Calendar.Time;
 
    D : GEM.LTE.Primitives.Shared.Param_S :=
@@ -118,7 +119,13 @@ begin
          end if;
          exit when GEM.LTE.Primitives.Halted;
       end;
-      Text_IO.Get_Immediate(Ch, Avail);
+      -- 
+      if Expect then
+         Text_IO.Get(Ch); 
+         Avail := True;
+      else
+         Text_IO.Get_Immediate(Ch, Avail);
+      end if;
       if Avail then
          if Ch = 'q' or Ch = 's' then
             GEM.LTE.Primitives.Stop;
