@@ -1,7 +1,8 @@
 project LTE is
    -- Laplace's Tidal Equation solution and optimization/fitting algorithms
 
-   for Source_Dirs use ("src");
+   for Source_Dirs use (--"src3", 
+                           "src");
    for Object_Dir use "obj";
    for Main use ("enso_opt.adb", "nao_opt.adb", "qbo_opt.adb", "tidal_opt.adb");
 
@@ -18,7 +19,7 @@ project LTE is
    end Builder;
 
    package Linker is
-      for Switches ("ada") use ("-g", "-Xlinker", "--stack=0x10000000,0x1000");
+      for Switches ("ada") use ("-g", "-Xlinker", "--stack=0x40000000,0x1000");
    end Linker;
 
    package Binder is
