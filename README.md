@@ -1,4 +1,7 @@
 # GeoEnergyMath
+
+*(This is deprecated,  go to [GEM-LTE](https://github.com/pukpr/GEM-LTE) for the latest)*
+
 Software libraries for solving models described in Mathematical GeoEnergy (Wiley, 2018)
 
 See the blog http://GeoEnergyMath.com and Azimuth Forum
