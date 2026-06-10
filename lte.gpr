@@ -19,7 +19,7 @@ project LTE is
    end Builder;
 
    package Linker is
-      for Switches ("ada") use ("-g", "-Xlinker", "--stack=0x40000000,0x1000");
+      -- for Switches ("ada") use ("-g", "-Xlinker", "--stack=0x40000000,0x1000");
    end Linker;
 
    package Binder is

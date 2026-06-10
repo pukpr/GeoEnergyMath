@@ -94,7 +94,7 @@ package body GEM.LTE.Primitives.Solution is
          CPU := I mod Num + 1;
          --TA := new Thread (CPU=>CPU_Number(I), N_Tides=>N_Tides, N_Modulations=>N_Modulations);
          TA := new Thread (CPU=>CPU_Range(CPU), N_Tides=>N_Tides, N_Modulations=>N_Modulations);
-         delay 1.0; -- let them gradually start up
+         delay 0.1; -- let them gradually start up
       end loop;
    end Start;
 
@@ -609,7 +609,7 @@ package body GEM.LTE.Primitives.Solution is
          if Revert_to_Mean = 0.0 then
             D.B.mA := abs D.B.mA;
          end if;
-         der := 1.0 - D.B.mA; -- - D.B.mP; -- keeps the integrator stable
+         der := 1.0 - D.B.mA - D.B.mP; -- keeps the integrator stable
 
          if Year_Trim then
             GEM.LTE.Year_Adjustment(D.B.Year, D.A.LP); -- should be a protected call?
@@ -747,6 +747,29 @@ package body GEM.LTE.Primitives.Solution is
          else
             -- Forcing := Median(Forcing);
 
+--            for I in reverse Forcing'First+1 .. Forcing'Last loop
+--                Forcing(I).Value := D.B.ImpC * (1.0 + D.B.ImpA*cos(2.0*Pi*(Forcing(I).Date-D.B.ImpB)))* (Forcing(I).Value - Forcing(I-1).Value) + Forcing(I).Value;
+--                -- Model(I).Value := Model(I).Value + D.B.IR*Impulses(I).Value;
+--            end loop;
+
+--            for I in reverse Forcing'First+1 .. Forcing'Last loop
+--                Forcing(I).Value := D.B.IR * (Forcing(I).Value - Forcing(I-1).Value) + Forcing(I).Value;
+--                --Forcing(I).Value := Forcing(I).Value + D.B.IR*Impulses(I).Value;
+--            end loop;
+
+            for I in reverse Forcing'First+1 .. Forcing'Last loop
+                Forcing(I).Value := (D.B.ImpC + D.B.ImpA*cos(2.0*Pi*(Forcing(I).Date-D.B.ImpB)))* (Forcing(I).Value - Forcing(I-1).Value) + Forcing(I).Value;
+                -- Model(I).Value := Model(I).Value + D.B.IR*Impulses(I).Value;
+            end loop;
+
+            for I in reverse Forcing'First+1 .. Forcing'Last loop
+                --Forcing(I).Value := D.B.IR * (Forcing(I).Value - Forcing(I-1).Value) + Forcing(I).Value;
+                Forcing(I).Value := Forcing(I).Value + D.B.IR*Impulses(I).Value;
+            end loop;
+
+            Forcing := Annual_Add(Forcing);
+
+
             Model := LTE(Forcing => Forcing,
                          Wave_Numbers => M(1 .. NM - 1 + Pareto_Index), --D.B.Lt(1..NM),
                          Amp_Phase => MAP(1 .. NM - 1 + Pareto_Index), --D.A.LTAP,
@@ -768,17 +791,6 @@ package body GEM.LTE.Primitives.Solution is
 --            for I in Model'Range loop
 --                Model(I).Value := Model(I).Value + D.B.IR*Impulses(I).Value;
 --            end loop;
-            for I in reverse Model'First+1 .. Model'Last loop
-                Model(I).Value := D.B.ImpC * (1.0 + D.B.ImpA*cos(2.0*Pi*(Model(I).Date-D.B.ImpB)))* (Model(I).Value - Model(I-1).Value) + Model(I).Value;
-                -- Model(I).Value := Model(I).Value + D.B.IR*Impulses(I).Value;
-            end loop;
-
-            for I in reverse Model'First+1 .. Model'Last loop
-                Model(I).Value := D.B.IR * (Model(I).Value - Model(I-1).Value) + Model(I).Value;
-                --Model(I).Value := Model(I).Value + D.B.IR*Impulses(I).Value;
-            end loop;
-
-            Model := Annual_Add(Model);
 
          end if;
 
@@ -910,7 +922,12 @@ package body GEM.LTE.Primitives.Solution is
                DBLAP : constant Amp_Phases := D.B.LPAP;
             begin
                Walker.Markov(Set, Keep, Spread, Set0);
-               D.B.LPAP := DBLAP;
+               for I in D.B.LPAP'Range loop
+                  D.B.LPAP(I).Amplitude := DBLAP(I).Amplitude;
+                  if D.B.LPAP(I).Phase < 2.0*pi then
+                     D.B.LPAP(I).Phase := D.B.LPAP(I).Phase + 2.0*pi;
+                  end if;
+               end loop;
             end;
          else
             Walker.Markov(Set, Keep, Spread, Set0);
